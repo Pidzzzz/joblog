@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+.env
+*.log
+journal.json
+.opencode-context*.json
+stdout.log
+stderr.log
+downloads/
