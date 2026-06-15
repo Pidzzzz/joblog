@@ -254,7 +254,7 @@ async def menu_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                 rt = escape_markdown(r['remind_at'][:16], version=2)
                 rtext = escape_markdown(r['text'], version=2)
                 repeat = f" \\(_{escape_markdown(r['repeat'], version=2)}_\\)" if r['repeat'] else ""
-                lines.append(f"  #{rid}  {rt}{repeat}  {rtext}")
+                lines.append(f"  \\#{rid}  {rt}{repeat}  {rtext}")
             msg = "\n".join(lines)
         else:
             msg = "⏰ *Reminder*\n\nBelum ada reminder aktif\\.\nPilih opsi di bawah untuk menambahkan\\."
@@ -375,7 +375,7 @@ async def menu_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                 rt = escape_markdown(r['remind_at'][:16], version=2)
                 rtext = escape_markdown(r['text'], version=2)
                 repeat = f" \\(_{escape_markdown(r['repeat'], version=2)}_\\)" if r['repeat'] else ""
-                lines.append(f"  #{rid}  {rt}{repeat}  {rtext}")
+                lines.append(f"  \\#{rid}  {rt}{repeat}  {rtext}")
             msg = "\n".join(lines)
         else:
             msg = "Tidak ada reminder aktif\\."
