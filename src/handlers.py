@@ -1036,7 +1036,7 @@ async def auto_log(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                     remind_at=remind_at,
                     repeat="daily",
                 )
-                await _send_and_auto_delete(update.message, f"✅ Reminder harian jam {state['time']} diatur!\nPesan: {text}")
+                await _send_and_auto_delete(update.message, f"✅ Reminder harian jam {state['time']} diatur\\!\nPesan: {text}")
                 return
 
         elif state["type"] == "once":
@@ -1071,7 +1071,7 @@ async def auto_log(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                     remind_at=remind_at,
                     repeat=None,
                 )
-                await _send_and_auto_delete(update.message, f"✅ Reminder sekali diatur!\n📅 {state['date']} {state['time']}\nPesan: {text}")
+                await _send_and_auto_delete(update.message, f"✅ Reminder sekali diatur\\!\n📅 {state['date']} {state['time']}\nPesan: {text}")
                 return
 
     safe_delete_message(update.message)
