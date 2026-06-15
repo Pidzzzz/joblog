@@ -170,6 +170,17 @@ async def start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⛔ Bot ini pribadi.")
         return
     track_user(update.effective_chat.id)
+    chat_id = update.effective_chat.id
+
+    safe_delete_message(update.message)
+
+    old_msg = last_bot_messages.get(chat_id)
+    if old_msg:
+        try:
+            await old_msg.delete()
+        except Exception:
+            pass
+
     s = storage.get_stats()
     xp = get_xp_progress(s["total"])
     rank = xp["rank"]
@@ -182,7 +193,8 @@ async def start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         "Setiap tugas, aktivitas, dan langkah perjalanan Anda akan direkam di sini\\.\n\n"
         "*Arise\\!* Mulai pencatatan Anda sekarang\\."
     )
-    await update.message.reply_text(text, parse_mode="MarkdownV2", reply_markup=_menu_keyboard())
+    msg = await update.message.reply_text(text, parse_mode="MarkdownV2", reply_markup=_menu_keyboard())
+    last_bot_messages[chat_id] = msg
 
 
 async def menu_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
