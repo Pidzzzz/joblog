@@ -1,0 +1,171 @@
+import os
+import asyncio
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.helpers import escape_markdown
+from telegram import Update
+
+OWNER_ID = int(os.getenv("DEVELOPER_ID", "0"))
+
+delete_selections = {}
+last_bot_messages = {}
+bot_message_history = {}
+user_reminder_state = {}
+
+
+def _is_owner(update: Update) -> bool:
+    return update.effective_user.id == OWNER_ID
+
+
+def safe_delete_message(message):
+    if not message:
+        return
+    async def _delete():
+        try:
+            await message.delete()
+        except Exception:
+            pass
+    asyncio.create_task(_delete())
+
+
+def _fmt_entry(e: dict) -> str:
+    return f"  \\#{e['id']}  \\[{escape_markdown(e['time'], version=2)}\\]  {escape_markdown(e['text'], version=2)}"
+
+
+def _fmt_entries(entries: list, title: str = None) -> str:
+    if not entries:
+        base = f"{escape_markdown(title, version=2)}\n\nTidak ada catatan\\." if title else "Tidak ada catatan\\."
+        return base + "\n\n_Ketik atau kirim pesan langsung untuk mencatat_"
+    lines = [f"*{escape_markdown(title, version=2)}*\n"] if title else []
+    for e in entries:
+        lines.append(_fmt_entry(e))
+    return "\n".join(lines)
+
+
+def _menu_keyboard():
+    keyboard = [
+        [
+            InlineKeyboardButton("📝 Log Aktivitas", callback_data="menu_log"),
+            InlineKeyboardButton("📅 Agenda Hari Ini", callback_data="menu_agenda"),
+        ],
+        [
+            InlineKeyboardButton("⚔️ Rank Hunter", callback_data="menu_rank"),
+            InlineKeyboardButton("📈 Statistik", callback_data="menu_stats"),
+        ],
+        [
+            InlineKeyboardButton("🔍 Cari Log", callback_data="menu_search"),
+            InlineKeyboardButton("🗂️ Arsip Harian", callback_data="menu_all"),
+        ],
+        [
+            InlineKeyboardButton("⏰ Pengingat", callback_data="menu_reminder"),
+            InlineKeyboardButton("🗑️ Hapus Log", callback_data="menu_clear"),
+        ],
+        [
+            InlineKeyboardButton("🔄 Restart Bot", callback_data="menu_restart"),
+            InlineKeyboardButton("❓ Panduan", callback_data="menu_help"),
+        ]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+
+def _section_keyboard(section):
+    if section == "log":
+        return InlineKeyboardMarkup([
+            [InlineKeyboardButton("📝 Log Baru", callback_data="menu_log"),
+             InlineKeyboardButton("📅 Agenda", callback_data="menu_agenda")],
+            [InlineKeyboardButton("🔍 Cari Log", callback_data="menu_search")],
+            [InlineKeyboardButton("❌ Kembali", callback_data="menu_start")],
+        ])
+    elif section == "rank":
+        return InlineKeyboardMarkup([
+            [InlineKeyboardButton("⚔️ Rank Saya", callback_data="menu_rank"),
+             InlineKeyboardButton("📈 Statistik", callback_data="menu_stats")],
+            [InlineKeyboardButton("❌ Kembali", callback_data="menu_start")],
+        ])
+    elif section == "search":
+        return InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔍 Cari Log", callback_data="menu_search"),
+             InlineKeyboardButton("🗂️ Arsip", callback_data="menu_all")],
+            [InlineKeyboardButton("❌ Kembali", callback_data="menu_start")],
+        ])
+    elif section == "reminder":
+        return InlineKeyboardMarkup([
+            [InlineKeyboardButton("➕ Reminder Harian", callback_data="add_remind_daily")],
+            [InlineKeyboardButton("➕ Reminder Sekali", callback_data="add_remind_once")],
+            [InlineKeyboardButton("❌ Kembali", callback_data="menu_start")],
+        ])
+    elif section == "danger":
+        return InlineKeyboardMarkup([
+            [InlineKeyboardButton("🗑️ Hapus Log", callback_data="menu_clear")],
+            [InlineKeyboardButton("🔄 Restart Bot", callback_data="menu_restart")],
+            [InlineKeyboardButton("❌ Kembali", callback_data="menu_start")],
+        ])
+    return _menu_keyboard()
+
+
+async def _send_and_auto_delete(message, text, delay=3):
+    msg = await message.reply_text(text)
+    chat_id = message.chat_id
+    if chat_id not in bot_message_history:
+        bot_message_history[chat_id] = []
+    bot_message_history[chat_id].append(msg.message_id)
+    asyncio.create_task(_auto_delete_message(message.bot, chat_id, msg.message_id, delay))
+
+
+async def _auto_delete_message(bot, chat_id, message_id, delay):
+    await asyncio.sleep(delay)
+    try:
+        await bot.delete_message(chat_id=chat_id, message_id=message_id)
+        if chat_id in bot_message_history and message_id in bot_message_history[chat_id]:
+            bot_message_history[chat_id].remove(message_id)
+    except Exception:
+        pass
+
+
+async def _delete_all_bot_messages(chat_id, ctx=None):
+    deleted = 0
+    
+    old_msg = last_bot_messages.get(chat_id)
+    if old_msg:
+        try:
+            await old_msg.delete()
+            deleted += 1
+        except Exception:
+            pass
+        last_bot_messages.pop(chat_id, None)
+    
+    if ctx:
+        if chat_id in bot_message_history:
+            for msg_id in list(bot_message_history[chat_id]):
+                try:
+                    await ctx.bot.delete_message(chat_id=chat_id, message_id=msg_id)
+                    deleted += 1
+                except Exception:
+                    pass
+            bot_message_history[chat_id] = []
+    
+    print(f"[CLEANUP] Deleted {deleted} messages for chat {chat_id}")
+
+
+async def _show_delete_list(query, entries, selected, user_id):
+    lines = [f"🗑️ *Hapus Log* \\({len(entries)} catatan hari ini\\)\n"]
+    lines.append("_Pilih log yang ingin dihapus, lalu tekan *Hapus Terpilih*_\n")
+    for e in entries:
+        check = "✅" if e["id"] in selected else "⬜"
+        t = escape_markdown(e["time"][:5], version=2)
+        txt = escape_markdown(e["text"], version=2)
+        lines.append(f"{check} `#{e['id']}` `[{t}]` {txt}")
+    msg = "\n".join(lines)
+
+    keyboard = []
+    for e in entries:
+        label = f"{'✅' if e['id'] in selected else '⬜'} #{e['id']} {e['time'][:5]}"
+        keyboard.append([InlineKeyboardButton(label, callback_data=f"toggle_del_{e['id']}")])
+
+    btn_row = []
+    if selected:
+        btn_row.append(InlineKeyboardButton(f"🗑️ Hapus ({len(selected)})", callback_data="delete_selected"))
+    btn_row.append(InlineKeyboardButton("🗑️ Hapus Semua", callback_data="delete_all_today"))
+    btn_row.append(InlineKeyboardButton("❌ Batal", callback_data="menu_start"))
+    keyboard.append(btn_row)
+
+    await query.edit_message_text(msg, parse_mode="MarkdownV2", reply_markup=InlineKeyboardMarkup(keyboard))
