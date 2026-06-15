@@ -203,7 +203,7 @@ async def menu_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     elif data == "menu_today":
         entries = storage.get_today()
         today_str = date.today().isoformat()
-msg = _fmt_entries(entries, f"Hari Ini \\({today_str}\\)")
+        msg = _fmt_entries(entries, f"Hari Ini \\({today_str}\\)")
         if len(msg) > 4000:
             msg = msg[:4000] + "\n\n... \(terlalu panjang\)"
         await query.edit_message_text(msg, parse_mode="MarkdownV2", reply_markup=_menu_keyboard())
