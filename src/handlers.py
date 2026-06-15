@@ -20,7 +20,7 @@ user_reminder_state = {}
 
 
 async def _send_and_auto_delete(message, text, delay=3):
-    msg = await message.reply_text(text, parse_mode="MarkdownV2")
+    msg = await message.reply_text(text)
     await asyncio.sleep(delay)
     try:
         await msg.delete()
