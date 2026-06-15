@@ -4,6 +4,7 @@ import os
 load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 
 import logging
+from telegram import BotCommand
 from telegram.ext import ApplicationBuilder
 from telegram.helpers import escape_markdown
 
@@ -51,6 +52,29 @@ async def post_init(app):
     restore_reminders(app.bot)
     print(f"SoloLeveling Journal Bot started. Owner: {OWNER_ID}")
     print(f"Reminders loaded and scheduler running.")
+
+    commands = [
+        BotCommand("start", "Menu utama"),
+        BotCommand("rank", "Cek Rank Hunter"),
+        BotCommand("agenda", "Agenda hari ini"),
+        BotCommand("log", "Catat kegiatan manual"),
+        BotCommand("today", "Lihat catatan hari ini"),
+        BotCommand("yesterday", "Lihat catatan kemarin"),
+        BotCommand("date", "Catatan tanggal tertentu"),
+        BotCommand("search", "Cari catatan lama"),
+        BotCommand("all", "Arsip semua tanggal"),
+        BotCommand("stats", "Statistik Hunter"),
+        BotCommand("export", "Export jurnal ke PDF"),
+        BotCommand("del", "Hapus catatan by ID"),
+        BotCommand("clear", "Hapus log interaktif"),
+        BotCommand("remind", "Reminder harian"),
+        BotCommand("remindat", "Reminder sekali"),
+        BotCommand("reminders", "Daftar reminder aktif"),
+        BotCommand("unremind", "Hapus reminder"),
+        BotCommand("restart", "Restart bot"),
+    ]
+    await app.bot.set_my_commands(commands)
+    print("Bot commands registered.")
 
     restart_file = os.path.join(os.path.dirname(__file__), ".restart_chat")
     if os.path.exists(restart_file):
