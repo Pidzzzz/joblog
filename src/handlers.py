@@ -9,6 +9,7 @@ from telegram.helpers import escape_markdown
 from src import storage
 from src import scheduler as sched
 from src.ranks import get_rank, get_xp_progress, get_streak_info, format_progress_bar
+from src.pdf_export import generate_pdf
 
 OWNER_ID = int(os.getenv("DEVELOPER_ID", "0"))
 
@@ -371,6 +372,9 @@ async def menu_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             "`/search <kata>` — Cari catatan lama\n"
             "`/all` — Tampilkan arsip tanggal\n"
             "`/stats` — Statistik Hunter\n"
+            "`/rank` — Cek Rank Hunter\n"
+            "`/export` — Export jurnal ke PDF\n"
+            "`/export YYYY-MM-DD YYYY-MM-DD` — Export periode tertentu\n"
             "`/del <id>` — Hapus catatan\n"
             "`/clear` — Hapus semua log catatan\n"
             "`/restart` — Memulai ulang bot (refresh)\n"
@@ -665,6 +669,54 @@ async def cmd_unremind(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"Reminder #{rid} tidak ditemukan.")
 
 
+async def cmd_export(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not _is_owner(update):
+        return
+    safe_delete_message(update.message)
+
+    msg = await update.message.reply_text("📄 *Generating PDF report\\.\\.\\.*", parse_mode="MarkdownV2")
+
+    try:
+        args = " ".join(ctx.args)
+        start_date = None
+        end_date = None
+
+        if args:
+            match = re.match(r"^(\d{4}-\d{2}-\d{2})\s+(\d{4}-\d{2}-\d{2})$", args)
+            if match:
+                start_date = match.group(1)
+                end_date = match.group(2)
+
+        output_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), f"journal_{date.today().isoformat()}.pdf")
+        generate_pdf(start_date=start_date, end_date=end_date, output_path=output_path)
+
+        await msg.delete()
+
+        caption = f"📄 *Journal Report*\n\n"
+        if start_date and end_date:
+            caption += f"Period: {start_date} to {end_date}\n"
+        else:
+            caption += f"All entries\n"
+        caption += f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+
+        with open(output_path, "rb") as f:
+            await update.message.reply_document(
+                document=f,
+                filename=f"journal_{date.today().isoformat()}.pdf",
+                caption=caption,
+                parse_mode="MarkdownV2",
+            )
+
+        os.remove(output_path)
+
+    except Exception as e:
+        try:
+            await msg.delete()
+        except Exception:
+            pass
+        await update.message.reply_text(f"❌ Gagal generate PDF: {str(e)}")
+
+
 async def cmd_rank(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not _is_owner(update):
         return
@@ -742,6 +794,7 @@ def get_handlers():
         CommandHandler("all", cmd_all),
         CommandHandler("stats", cmd_stats),
         CommandHandler("rank", cmd_rank),
+        CommandHandler("export", cmd_export),
         CommandHandler("del", cmd_del),
         CommandHandler("clear", cmd_clear),
         CommandHandler("restart", cmd_restart),
