@@ -694,7 +694,7 @@ async def cmd_export(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
         await msg.delete()
 
-        caption = f"📄 *Journal Report*\n\n"
+        caption = f"Journal Report\n\n"
         if start_date and end_date:
             caption += f"Period: {start_date} to {end_date}\n"
         else:
@@ -706,7 +706,6 @@ async def cmd_export(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                 document=f,
                 filename=f"journal_{date.today().isoformat()}.pdf",
                 caption=caption,
-                parse_mode="MarkdownV2",
             )
 
         os.remove(output_path)
