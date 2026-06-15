@@ -13,6 +13,7 @@ from src.ranks import get_rank, get_xp_progress, get_streak_info, format_progres
 OWNER_ID = int(os.getenv("DEVELOPER_ID", "0"))
 
 delete_selections = {}
+last_bot_messages = {}
 
 
 def _is_owner(update: Update) -> bool:
@@ -381,12 +382,20 @@ async def cmd_log(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Gunakan: /log <teks kegiatan>")
         return
     
-    # Hapus pesan perintah /log dari user di background agar instan
+    chat_id = update.effective_chat.id
     safe_delete_message(update.message)
 
+    old_msg = last_bot_messages.get(chat_id)
+    if old_msg:
+        try:
+            await old_msg.delete()
+        except Exception:
+            pass
+
     entry = storage.add_entry(text)
-    msg = f"✅ *Tersimpan*\n{_fmt_entry(entry)}"
-    await update.message.reply_text(msg, parse_mode="MarkdownV2", reply_markup=_menu_keyboard())
+    msg_text = f"✅ *Tersimpan*\n{_fmt_entry(entry)}"
+    msg = await update.message.reply_text(msg_text, parse_mode="MarkdownV2", reply_markup=_menu_keyboard())
+    last_bot_messages[chat_id] = msg
 
 
 async def cmd_agenda(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -698,12 +707,20 @@ async def auto_log(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not text:
         return
 
-    # Hapus pesan teks langsung dari user di background agar instan
+    chat_id = update.effective_chat.id
     safe_delete_message(update.message)
 
+    old_msg = last_bot_messages.get(chat_id)
+    if old_msg:
+        try:
+            await old_msg.delete()
+        except Exception:
+            pass
+
     entry = storage.add_entry(text)
-    msg = f"✅ *Tersimpan*\n{_fmt_entry(entry)}"
-    await update.message.reply_text(msg, parse_mode="MarkdownV2", reply_markup=_menu_keyboard())
+    msg_text = f"✅ *Tersimpan*\n{_fmt_entry(entry)}"
+    msg = await update.message.reply_text(msg_text, parse_mode="MarkdownV2", reply_markup=_menu_keyboard())
+    last_bot_messages[chat_id] = msg
 
 
 def get_handlers():
