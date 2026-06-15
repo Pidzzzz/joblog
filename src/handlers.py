@@ -339,11 +339,11 @@ async def menu_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             reply_markup=_menu_keyboard()
         )
     elif data == "menu_restart":
-        await query.edit_message_text("🔄 *Memulai ulang bot... Arise\\!*", parse_mode="MarkdownV2")
+        await query.edit_message_text("🔄 *Memulai ulang bot\\.\\.\\. Arise\\!*", parse_mode="MarkdownV2")
         await asyncio.sleep(1)
-        import sys
-        import os
-        os.execv(sys.executable, [sys.executable] + sys.argv)
+        import subprocess, sys
+        subprocess.Popen([sys.executable] + sys.argv, cwd=os.path.dirname(os.path.abspath(__file__)) + "/..")
+        os._exit(0)
     elif data == "menu_help":
         text = (
             "⚔️ *SoloLeveling Journal* ⚔️\n\n"
@@ -533,11 +533,11 @@ async def cmd_restart(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not _is_owner(update):
         return
     safe_delete_message(update.message)
-    await update.message.reply_text("🔄 *Memulai ulang bot... Arise\\!*", parse_mode="MarkdownV2")
+    await update.message.reply_text("🔄 *Memulai ulang bot\\.\\.\\. Arise\\!*", parse_mode="MarkdownV2")
     await asyncio.sleep(1)
-    import sys
-    import os
-    os.execv(sys.executable, [sys.executable] + sys.argv)
+    import subprocess, sys
+    subprocess.Popen([sys.executable] + sys.argv, cwd=os.path.dirname(os.path.abspath(__file__)) + "/..")
+    os._exit(0)
 
 
 async def cmd_remind(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
