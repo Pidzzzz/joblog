@@ -521,13 +521,6 @@ async def auto_log(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
     safe_delete_message(update.message)
 
-    old_msg = last_bot_messages.get(chat_id)
-    if old_msg:
-        try:
-            await old_msg.delete()
-        except Exception:
-            pass
-
     entry = storage.add_entry(text)
     msg_text = f"✅ *Tersimpan*\n{_fmt_entry(entry)}"
     
