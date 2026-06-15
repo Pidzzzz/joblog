@@ -339,6 +339,9 @@ async def menu_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             reply_markup=_menu_keyboard()
         )
     elif data == "menu_restart":
+        restart_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".restart_chat")
+        with open(restart_file, "w") as f:
+            f.write(str(update.effective_chat.id))
         await query.edit_message_text("🔄 *Memulai ulang bot\\.\\.\\. Arise\\!*", parse_mode="MarkdownV2")
         await asyncio.sleep(1)
         import subprocess, sys
@@ -533,6 +536,9 @@ async def cmd_restart(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not _is_owner(update):
         return
     safe_delete_message(update.message)
+    restart_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".restart_chat")
+    with open(restart_file, "w") as f:
+        f.write(str(update.effective_chat.id))
     await update.message.reply_text("🔄 *Memulai ulang bot\\.\\.\\. Arise\\!*", parse_mode="MarkdownV2")
     await asyncio.sleep(1)
     import subprocess, sys

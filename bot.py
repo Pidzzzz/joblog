@@ -32,6 +32,24 @@ async def post_init(app):
     print(f"SoloLeveling Journal Bot started. Owner: {OWNER_ID}")
     print(f"Reminders loaded and scheduler running.")
 
+    restart_file = os.path.join(os.path.dirname(__file__), ".restart_chat")
+    if os.path.exists(restart_file):
+        try:
+            with open(restart_file, "r") as f:
+                chat_id = int(f.read().strip())
+            await app.bot.send_message(
+                chat_id=chat_id,
+                text="✅ *Bot berhasil restart\\! Arise\\!*",
+                parse_mode="MarkdownV2",
+            )
+        except Exception:
+            pass
+        finally:
+            try:
+                os.remove(restart_file)
+            except Exception:
+                pass
+
 def main():
     app = ApplicationBuilder().token(TOKEN).post_init(post_init).build()
 
