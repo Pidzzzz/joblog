@@ -16,6 +16,7 @@ OWNER_ID = int(os.getenv("DEVELOPER_ID", "0"))
 
 delete_selections = {}
 last_bot_messages = {}
+user_reminder_state = {}
 
 
 async def _send_and_auto_delete(message, text, delay=3):
@@ -259,17 +260,112 @@ async def menu_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             msg = "⏰ *Reminder*\n\nBelum ada reminder aktif\\.\nPilih opsi di bawah untuk menambahkan\\."
         await query.edit_message_text(msg, parse_mode="MarkdownV2", reply_markup=InlineKeyboardMarkup(keyboard))
     elif data == "add_remind_daily":
+        keyboard = [
+            [InlineKeyboardButton("🌅 06:00", callback_data="set_daily_06:00"),
+             InlineKeyboardButton("☀️ 07:00", callback_data="set_daily_07:00"),
+             InlineKeyboardButton("🌤️ 08:00", callback_data="set_daily_08:00")],
+            [InlineKeyboardButton("⏰ 09:00", callback_data="set_daily_09:00"),
+             InlineKeyboardButton("🕙 10:00", callback_data="set_daily_10:00"),
+             InlineKeyboardButton("🕚 11:00", callback_data="set_daily_11:00")],
+            [InlineKeyboardButton("🕛 12:00", callback_data="set_daily_12:00"),
+             InlineKeyboardButton("🕐 13:00", callback_data="set_daily_13:00"),
+             InlineKeyboardButton("🕑 14:00", callback_data="set_daily_14:00")],
+            [InlineKeyboardButton("🕒 15:00", callback_data="set_daily_15:00"),
+             InlineKeyboardButton("🕓 16:00", callback_data="set_daily_16:00"),
+             InlineKeyboardButton("🕔 17:00", callback_data="set_daily_17:00")],
+            [InlineKeyboardButton("🕕 18:00", callback_data="set_daily_18:00"),
+             InlineKeyboardButton("🕖 19:00", callback_data="set_daily_19:00"),
+             InlineKeyboardButton("🕗 20:00", callback_data="set_daily_20:00")],
+            [InlineKeyboardButton("✏️ Jam Lain", callback_data="set_daily_custom")],
+            [InlineKeyboardButton("❌ Kembali", callback_data="menu_reminder")],
+        ]
         await query.edit_message_text(
-            "⏰ *Reminder Harian*\n\nKetik jam dan pesan:\n`/remind HH:MM pesan`\n\nContoh:\n`/remind 09:00 Minum kopi`",
+            "⏰ *Reminder Harian*\nPilih jam:",
             parse_mode="MarkdownV2",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Kembali", callback_data="menu_reminder")]]),
+            reply_markup=InlineKeyboardMarkup(keyboard),
         )
     elif data == "add_remind_once":
+        today = date.today().isoformat()
+        keyboard = [
+            [InlineKeyboardButton("📅 Hari Ini", callback_data=f"set_once_{today}")],
+            [InlineKeyboardButton("📅 Besok", callback_data=f"set_once_{(date.today() + timedelta(days=1)).isoformat()}")],
+            [InlineKeyboardButton("📅 Lusa", callback_data=f"set_once_{(date.today() + timedelta(days=2)).isoformat()}")],
+            [InlineKeyboardButton("✏️ Tanggal Lain", callback_data="set_once_custom")],
+            [InlineKeyboardButton("❌ Kembali", callback_data="menu_reminder")],
+        ]
         await query.edit_message_text(
-            "⏰ *Reminder Sekali*\n\nKetik tanggal, jam, dan pesan:\n`/remindat YYYY\-MM\-DD HH:MM pesan`\n\nContoh:\n`/remindat 2026\-06\-20 14:00 Meeting`",
+            "⏰ *Reminder Sekali*\nPilih tanggal:",
             parse_mode="MarkdownV2",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Kembali", callback_data="menu_reminder")]]),
+            reply_markup=InlineKeyboardMarkup(keyboard),
         )
+    elif data.startswith("set_daily_"):
+        time_str = data.replace("set_daily_", "")
+        if time_str == "custom":
+            await query.edit_message_text(
+                "✏️ *Ketik jam manual:*\nFormat: `HH:MM`\nContoh: `09:30`",
+                parse_mode="MarkdownV2",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Batal", callback_data="add_remind_daily")]]),
+            )
+            user_reminder_state[update.effective_user.id] = {"type": "daily", "step": "time"}
+        else:
+            user_reminder_state[update.effective_user.id] = {"type": "daily", "time": time_str, "step": "text"}
+            await query.edit_message_text(
+                f"⏰ Reminder harian jam *{time_str}*\n\nKetik pesan reminder:",
+                parse_mode="MarkdownV2",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Batal", callback_data="add_remind_daily")]]),
+            )
+    elif data.startswith("set_once_"):
+        date_str = data.replace("set_once_", "")
+        if date_str == "custom":
+            await query.edit_message_text(
+                "✏️ *Ketik tanggal manual:*\nFormat: `YYYY\-MM\-DD`\nContoh: `2026\-06\-20`",
+                parse_mode="MarkdownV2",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Batal", callback_data="add_remind_once")]]),
+            )
+            user_reminder_state[update.effective_user.id] = {"type": "once", "step": "date"}
+        else:
+            keyboard = [
+                [InlineKeyboardButton("🌅 06:00", callback_data=f"set_once_time_{date_str}_06:00"),
+                 InlineKeyboardButton("☀️ 07:00", callback_data=f"set_once_time_{date_str}_07:00"),
+                 InlineKeyboardButton("🌤️ 08:00", callback_data=f"set_once_time_{date_str}_08:00")],
+                [InlineKeyboardButton("⏰ 09:00", callback_data=f"set_once_time_{date_str}_09:00"),
+                 InlineKeyboardButton("🕙 10:00", callback_data=f"set_once_time_{date_str}_10:00"),
+                 InlineKeyboardButton("🕚 11:00", callback_data=f"set_once_time_{date_str}_11:00")],
+                [InlineKeyboardButton("🕛 12:00", callback_data=f"set_once_time_{date_str}_12:00"),
+                 InlineKeyboardButton("🕐 13:00", callback_data=f"set_once_time_{date_str}_13:00"),
+                 InlineKeyboardButton("🕑 14:00", callback_data=f"set_once_time_{date_str}_14:00")],
+                [InlineKeyboardButton("🕒 15:00", callback_data=f"set_once_time_{date_str}_15:00"),
+                 InlineKeyboardButton("🕓 16:00", callback_data=f"set_once_time_{date_str}_16:00"),
+                 InlineKeyboardButton("🕔 17:00", callback_data=f"set_once_time_{date_str}_17:00")],
+                [InlineKeyboardButton("🕕 18:00", callback_data=f"set_once_time_{date_str}_18:00"),
+                 InlineKeyboardButton("🕖 19:00", callback_data=f"set_once_time_{date_str}_19:00"),
+                 InlineKeyboardButton("🕗 20:00", callback_data=f"set_once_time_{date_str}_20:00")],
+                [InlineKeyboardButton("✏️ Jam Lain", callback_data=f"set_once_time_{date_str}_custom")],
+                [InlineKeyboardButton("❌ Kembali", callback_data="add_remind_once")],
+            ]
+            await query.edit_message_text(
+                f"📅 *{date_str}*\nPilih jam:",
+                parse_mode="MarkdownV2",
+                reply_markup=InlineKeyboardMarkup(keyboard),
+            )
+    elif data.startswith("set_once_time_"):
+        parts = data.replace("set_once_time_", "").rsplit("_", 1)
+        date_str = parts[0]
+        time_str = parts[1]
+        if time_str == "custom":
+            user_reminder_state[update.effective_user.id] = {"type": "once", "date": date_str, "step": "time"}
+            await query.edit_message_text(
+                "✏️ *Ketik jam manual:*\nFormat: `HH:MM`\nContoh: `14:30`",
+                parse_mode="MarkdownV2",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Batal", callback_data="add_remind_once")]]),
+            )
+        else:
+            user_reminder_state[update.effective_user.id] = {"type": "once", "date": date_str, "time": time_str, "step": "text"}
+            await query.edit_message_text(
+                f"📅 *{date_str}* jam *{time_str}*\n\nKetik pesan reminder:",
+                parse_mode="MarkdownV2",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Batal", callback_data="add_remind_once")]]),
+            )
     elif data == "list_reminders":
         reminders = sched.get_reminders(update.effective_user.id)
         if reminders:
@@ -909,8 +1005,75 @@ async def auto_log(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not text:
         return
 
+    uid = update.effective_user.id
     chat_id = update.effective_chat.id
     track_user(chat_id)
+
+    if uid in user_reminder_state:
+        state = user_reminder_state.pop(uid)
+        step = state["step"]
+
+        if state["type"] == "daily":
+            if step == "time":
+                if not re.match(r"^\d{1,2}:\d{2}$", text):
+                    await update.message.reply_text("Format jam salah. Gunakan: HH:MM\nContoh: 09:30")
+                    return
+                state["time"] = text
+                state["step"] = "text"
+                user_reminder_state[uid] = state
+                await update.message.reply_text(f"⏰ Reminder harian jam {text}\n\nKetik pesan reminder:")
+                return
+            elif step == "text":
+                hour, minute = map(int, state["time"].split(":"))
+                now = datetime.now()
+                remind_at = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+                if remind_at <= now:
+                    remind_at += timedelta(days=1)
+                sched.add_reminder(
+                    bot=ctx.bot,
+                    chat_id=chat_id,
+                    text=text,
+                    remind_at=remind_at,
+                    repeat="daily",
+                )
+                await _send_and_auto_delete(update.message, f"✅ Reminder harian jam {state['time']} diatur!\nPesan: {text}")
+                return
+
+        elif state["type"] == "once":
+            if step == "date":
+                if not re.match(r"^\d{4}-\d{2}-\d{2}$", text):
+                    await update.message.reply_text("Format tanggal salah. Gunakan: YYYY-MM-DD\nContoh: 2026-06-20")
+                    return
+                state["date"] = text
+                state["step"] = "time"
+                user_reminder_state[uid] = state
+                await update.message.reply_text(f"📅 Tanggal: {text}\n\nKetik jam (HH:MM):")
+                return
+            elif step == "time":
+                if not re.match(r"^\d{1,2}:\d{2}$", text):
+                    await update.message.reply_text("Format jam salah. Gunakan: HH:MM\nContoh: 14:30")
+                    return
+                state["time"] = text
+                state["step"] = "text"
+                user_reminder_state[uid] = state
+                await update.message.reply_text(f"📅 {state['date']} jam {text}\n\nKetik pesan reminder:")
+                return
+            elif step == "text":
+                try:
+                    remind_at = datetime.strptime(f"{state['date']} {state['time']}", "%Y-%m-%d %H:%M")
+                except ValueError:
+                    await update.message.reply_text("Tanggal atau jam tidak valid.")
+                    return
+                sched.add_reminder(
+                    bot=ctx.bot,
+                    chat_id=chat_id,
+                    text=text,
+                    remind_at=remind_at,
+                    repeat=None,
+                )
+                await _send_and_auto_delete(update.message, f"✅ Reminder sekali diatur!\n📅 {state['date']} {state['time']}\nPesan: {text}")
+                return
+
     safe_delete_message(update.message)
 
     old_msg = last_bot_messages.get(chat_id)
