@@ -8,6 +8,7 @@ from telegram.helpers import escape_markdown
 
 from src import storage
 from src import scheduler as sched
+from src.ranks import get_rank, get_xp_progress, get_streak_info, format_progress_bar
 
 OWNER_ID = int(os.getenv("DEVELOPER_ID", "0"))
 
@@ -47,18 +48,19 @@ def _menu_keyboard():
             InlineKeyboardButton("📅 Agenda Hari Ini", callback_data="menu_agenda"),
         ],
         [
+            InlineKeyboardButton("⚔️ Rank Hunter", callback_data="menu_rank"),
+            InlineKeyboardButton("📈 Statistik", callback_data="menu_stats"),
+        ],
+        [
             InlineKeyboardButton("🔍 Cari Log", callback_data="menu_search"),
             InlineKeyboardButton("🗂️ Arsip Harian", callback_data="menu_all"),
         ],
         [
             InlineKeyboardButton("⏰ Pengingat", callback_data="menu_reminder"),
-            InlineKeyboardButton("📈 Statistik Hunter", callback_data="menu_stats"),
-        ],
-        [
             InlineKeyboardButton("🗑️ Hapus Log", callback_data="menu_clear"),
-            InlineKeyboardButton("🔄 Restart Bot", callback_data="menu_restart"),
         ],
         [
+            InlineKeyboardButton("🔄 Restart Bot", callback_data="menu_restart"),
             InlineKeyboardButton("❓ Panduan", callback_data="menu_help"),
         ]
     ]
@@ -127,10 +129,14 @@ async def start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not _is_owner(update):
         await update.message.reply_text("⛔ Bot ini pribadi.")
         return
+    s = storage.get_stats()
+    xp = get_xp_progress(s["total"])
+    rank = xp["rank"]
     text = (
         "╔════════════════════════╗\n"
         "   ⚔️  *SOLO LEVELING JOURNAL*  ⚔️   \n"
         "╚════════════════════════╝\n\n"
+        f"{rank['emoji']} *Rank:* `{escape_markdown(rank['rank'], version=2)}` \\— {escape_markdown(rank['title'], version=2)}\n\n"
         "Selamat datang, *Hunter*\\. Ini adalah log harian pribadi Anda\\.\n"
         "Setiap tugas, aktivitas, dan langkah perjalanan Anda akan direkam di sini\\.\n\n"
         "*Arise\\!* Mulai pencatatan Anda sekarang\\."
@@ -144,10 +150,14 @@ async def menu_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     data = query.data
 
     if data == "menu_start":
+        s = storage.get_stats()
+        xp = get_xp_progress(s["total"])
+        rank = xp["rank"]
         text = (
             "╔════════════════════════╗\n"
             "   ⚔️  *SOLO LEVELING JOURNAL*  ⚔️   \n"
             "╚════════════════════════╝\n\n"
+            f"{rank['emoji']} *Rank:* `{escape_markdown(rank['rank'], version=2)}` \\— {escape_markdown(rank['title'], version=2)}\n\n"
             "Selamat datang, *Hunter*\\. Ini adalah log harian pribadi Anda\\.\n"
             "Setiap tugas, aktivitas, dan langkah perjalanan Anda akan direkam di sini\\.\n\n"
             "*Arise\\!* Mulai pencatatan Anda sekarang\\."
@@ -195,6 +205,38 @@ async def menu_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             msg = "\n".join(lines)
         else:
             msg = "⏰ *Reminder*\n\nBelum ada reminder aktif\\.\n\nGunakan:\n`/remind <HH:MM> <pesan>` untuk reminder harian\n`/remindat <YYYY-MM-DD HH:MM> <pesan>` untuk sekali"
+        await query.edit_message_text(msg, parse_mode="MarkdownV2", reply_markup=_menu_keyboard())
+    elif data == "menu_rank":
+        s = storage.get_stats()
+        total = s["total"]
+        all_entries = storage.get_all_entries()
+        xp = get_xp_progress(total)
+        streak = get_streak_info(all_entries)
+        bar = format_progress_bar(xp["percent"])
+        rank = xp["rank"]
+        next_rank = xp["next"]
+        lines = [
+            "╔════════════════════════╗",
+            "⚔️   *HUNTER RANK STATUS*   ⚔️",
+            "╚════════════════════════╝\n",
+            f"{rank['emoji']} *Rank:* `{escape_markdown(rank['rank'], version=2)}` \\— {escape_markdown(rank['title'], version=2)}",
+            f"📊 *Total Catatan:* `{total}`",
+            f"📅 *Hari Aktif:* `{s['days']}`\n",
+        ]
+        if next_rank:
+            lines.append(f"*Progress ke {escape_markdown(next_rank['rank'], version=2)}:*\n")
+            lines.append(f"`{bar}` {xp['percent']}%")
+            lines.append(f"_{xp['entries_needed']} catatan lagi ke {escape_markdown(next_rank['rank'], version=2)}_")
+        else:
+            lines.append("_*MAX RANK TERCAPAI\\!* 🏆_")
+        if streak["streak"] > 0:
+            lines.append(f"\n🔥 *Streak:* `{streak['streak']}` hari")
+            if streak["milestone"]:
+                m = streak["milestone"]
+                lines.append(f"{m['emoji']} *Title:* {escape_markdown(m['title'], version=2)}")
+        lines.append("\n━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        lines.append("_Terus catat aktivitas\\! Arise\\!_")
+        msg = "\n".join(lines)
         await query.edit_message_text(msg, parse_mode="MarkdownV2", reply_markup=_menu_keyboard())
     elif data == "menu_stats":
         s = storage.get_stats()
@@ -250,6 +292,7 @@ async def menu_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             "⚔️ *SoloLeveling Journal* ⚔️\n\n"
             "*Commands:*\n"
             "`/start` — Menu utama\n"
+            "`/rank` — Cek Rank Hunter kamu\n"
             "`/agenda` — Tampilkan agenda hari ini\n"
             "`/log <teks>` — Catat kegiatan manual\n"
             "`/today` — Lihat catatan hari ini\n"
@@ -526,6 +569,49 @@ async def cmd_unremind(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"Reminder #{rid} tidak ditemukan.")
 
 
+async def cmd_rank(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not _is_owner(update):
+        return
+    safe_delete_message(update.message)
+    s = storage.get_stats()
+    total = s["total"]
+    all_entries = storage.get_all_entries()
+    xp = get_xp_progress(total)
+    streak = get_streak_info(all_entries)
+    bar = format_progress_bar(xp["percent"])
+
+    rank = xp["rank"]
+    next_rank = xp["next"]
+
+    lines = [
+        "╔════════════════════════╗",
+        "⚔️   *HUNTER RANK STATUS*   ⚔️",
+        "╚════════════════════════╝\n",
+        f"{rank['emoji']} *Rank:* `{escape_markdown(rank['rank'], version=2)}` \\— {escape_markdown(rank['title'], version=2)}",
+        f"📊 *Total Catatan:* `{total}`",
+        f"📅 *Hari Aktif:* `{s['days']}`\n",
+    ]
+
+    if next_rank:
+        lines.append(f"*Progress ke {escape_markdown(next_rank['rank'], version=2)}:*\n")
+        lines.append(f"`{bar}` {xp['percent']}%")
+        lines.append(f"_{xp['entries_needed']} catatan lagi ke {escape_markdown(next_rank['rank'], version=2)}_")
+    else:
+        lines.append("_*MAX RANK TERCAPAI\\!* 🏆_")
+
+    if streak["streak"] > 0:
+        lines.append(f"\n🔥 *Streak:* `{streak['streak']}` hari")
+        if streak["milestone"]:
+            m = streak["milestone"]
+            lines.append(f"{m['emoji']} *Title:* {escape_markdown(m['title'], version=2)}")
+
+    lines.append("\n━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    lines.append("_Terus catat aktivitas\\! Arise\\!_")
+
+    msg = "\n".join(lines)
+    await update.message.reply_text(msg, parse_mode="MarkdownV2", reply_markup=_menu_keyboard())
+
+
 async def auto_log(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not _is_owner(update):
         return
@@ -552,6 +638,7 @@ def get_handlers():
         CommandHandler("search", cmd_search),
         CommandHandler("all", cmd_all),
         CommandHandler("stats", cmd_stats),
+        CommandHandler("rank", cmd_rank),
         CommandHandler("del", cmd_del),
         CommandHandler("clear", cmd_clear),
         CommandHandler("restart", cmd_restart),

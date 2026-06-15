@@ -45,6 +45,11 @@ def search(keyword: str) -> list:
     kw = keyword.lower()
     return [e for e in data["entries"] if kw in e["text"].lower()]
 
+def get_all_entries() -> list:
+    data = _load()
+    return data["entries"]
+
+
 def get_all_dates() -> list:
     data = _load()
     dates = {}

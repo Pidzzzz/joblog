@@ -1,8 +1,8 @@
 # Load env before ANY other imports
 from dotenv import load_dotenv
-load_dotenv("D:/joblog/.env")
-
 import os
+load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
+
 import logging
 from telegram.ext import ApplicationBuilder
 
