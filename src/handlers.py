@@ -1168,13 +1168,18 @@ async def auto_log(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
     entry = storage.add_entry(text)
     msg_text = f"✅ *Tersimpan*\n{_fmt_entry(entry)}"
+    
+    if chat_id not in bot_message_history:
+        bot_message_history[chat_id] = []
+    
     try:
         msg = await ctx.bot.send_message(chat_id=chat_id, text=msg_text, parse_mode="MarkdownV2")
         bot_message_history[chat_id].append(msg.message_id)
         await asyncio.sleep(3)
         try:
             await msg.delete()
-            bot_message_history[chat_id].remove(msg.message_id)
+            if msg.message_id in bot_message_history[chat_id]:
+                bot_message_history[chat_id].remove(msg.message_id)
         except Exception:
             pass
     except Exception:
