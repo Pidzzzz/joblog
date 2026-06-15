@@ -16,6 +16,15 @@ delete_selections = {}
 last_bot_messages = {}
 
 
+async def _send_and_auto_delete(message, text, delay=3):
+    msg = await message.reply_text(text, parse_mode="MarkdownV2")
+    await asyncio.sleep(delay)
+    try:
+        await msg.delete()
+    except Exception:
+        pass
+
+
 def _is_owner(update: Update) -> bool:
     return update.effective_user.id == OWNER_ID
 
@@ -394,8 +403,7 @@ async def cmd_log(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
     entry = storage.add_entry(text)
     msg_text = f"✅ *Tersimpan*\n{_fmt_entry(entry)}"
-    msg = await update.message.reply_text(msg_text, parse_mode="MarkdownV2", reply_markup=_menu_keyboard())
-    last_bot_messages[chat_id] = msg
+    await _send_and_auto_delete(update.message, msg_text)
 
 
 async def cmd_agenda(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -719,8 +727,7 @@ async def auto_log(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
     entry = storage.add_entry(text)
     msg_text = f"✅ *Tersimpan*\n{_fmt_entry(entry)}"
-    msg = await update.message.reply_text(msg_text, parse_mode="MarkdownV2", reply_markup=_menu_keyboard())
-    last_bot_messages[chat_id] = msg
+    await _send_and_auto_delete(update.message, msg_text)
 
 
 def get_handlers():
