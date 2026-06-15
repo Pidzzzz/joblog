@@ -203,9 +203,9 @@ async def menu_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     elif data == "menu_today":
         entries = storage.get_today()
         today_str = date.today().isoformat()
-        msg = _fmt_entries(entries, f"Hari Ini ({today_str})")
+msg = _fmt_entries(entries, f"Hari Ini \\({today_str}\\)")
         if len(msg) > 4000:
-            msg = msg[:4000] + "\n\n... (terlalu panjang)"
+            msg = msg[:4000] + "\n\n... \(terlalu panjang\)"
         await query.edit_message_text(msg, parse_mode="MarkdownV2", reply_markup=_menu_keyboard())
     elif data == "menu_date":
         await query.edit_message_text(
@@ -285,7 +285,7 @@ async def menu_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             msg = "Belum ada catatan\\."
         else:
             total = storage.get_entry_count()
-            lines = [f"🗂️ *Arsip Harian ({total} catatan)*\n"]
+            lines = [f"🗂️ *Arsip Harian \\({total} catatan\\)*\n"]
             for d, count in dates:
                 lines.append(f"  {escape_markdown(d, version=2)}  \\({count}\\)")
             msg = "\n".join(lines)
@@ -414,7 +414,7 @@ async def cmd_today(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     today_str = date.today().isoformat()
     msg = _fmt_entries(entries, f"Hari Ini ({today_str})")
     if len(msg) > 4000:
-        msg = msg[:4000] + "\n\n... (terlalu panjang)"
+        msg = msg[:4000] + "\n\n... \(terlalu panjang\)"
     await update.message.reply_text(msg, parse_mode="MarkdownV2", reply_markup=_menu_keyboard())
 
 
@@ -455,7 +455,7 @@ async def cmd_search(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         return
     msg = _fmt_entries(results, f"Hasil pencarian: {kw} ({len(results)})")
     if len(msg) > 4000:
-        msg = msg[:4000] + "\n\n... (terlalu panjang)"
+        msg = msg[:4000] + "\n\n... \(terlalu panjang\)"
     await update.message.reply_text(msg, parse_mode="MarkdownV2", reply_markup=_menu_keyboard())
 
 
