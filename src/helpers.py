@@ -16,8 +16,13 @@ bot_stats = {
     "messages_sent": 0,
     "commands_used": 0,
     "callbacks_handled": 0,
+    "tokens_used": 0,
     "start_time": None,
 }
+
+
+def estimate_tokens(text: str) -> int:
+    return len(text) // 3
 
 
 def _is_owner(update: Update) -> bool:

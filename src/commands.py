@@ -15,7 +15,7 @@ from src.helpers import (
     OWNER_ID, _is_owner, safe_delete_message, _fmt_entry, _fmt_entries,
     _menu_keyboard, _section_keyboard, _send_and_auto_delete,
     _delete_all_bot_messages, last_bot_messages, bot_message_history,
-    user_reminder_state, bot_stats
+    user_reminder_state, bot_stats, estimate_tokens
 )
 
 
@@ -81,6 +81,8 @@ async def cmd_log(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     try:
         msg = await ctx.bot.send_message(chat_id=chat_id, text=msg_text, parse_mode="MarkdownV2")
         bot_message_history[chat_id].append(msg.message_id)
+        bot_stats["messages_sent"] += 1
+        bot_stats["tokens_used"] += estimate_tokens(msg_text)
         asyncio.create_task(_auto_delete_message(ctx.bot, chat_id, msg.message_id, 3))
     except Exception:
         pass
@@ -442,7 +444,8 @@ async def cmd_ai(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         f"  📤 Pesan dikirim: `{bot_stats['messages_sent']}`\n"
         f"  ⚡ Commands dipanggil: `{bot_stats['commands_used']}`\n"
         f"  🔘 Callbacks ditangani: `{bot_stats['callbacks_handled']}`\n"
-        f"  🔄 Total API calls: `{total_api_calls}`\n\n"
+        f"  🔄 Total API calls: `{total_api_calls}`\n"
+        f"  🎯 Token terpakai: `{bot_stats['tokens_used']}`\n\n"
         "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
         f"⏱️ *Uptime:* `{hours}j {minutes}m {seconds}s`\n\n"
         "_Bot ini dibangun oleh MiMoCode AI Assistant_"
