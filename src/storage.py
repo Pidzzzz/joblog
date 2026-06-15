@@ -76,3 +76,7 @@ def delete_entry(entry_id: int) -> bool:
             _save(data)
             return True
     return False
+
+def clear_all():
+    data = {"entries": [], "next_id": 1}
+    _save(data)

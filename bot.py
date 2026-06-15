@@ -3,9 +3,11 @@ from dotenv import load_dotenv
 load_dotenv("D:/joblog/.env")
 
 import os
+import logging
 from telegram.ext import ApplicationBuilder
 
 from src.handlers import get_handlers
+from src.scheduler import scheduler, restore_reminders
 
 TOKEN = os.getenv("BOT_TOKEN")
 OWNER_ID = int(os.getenv("DEVELOPER_ID", "0"))
@@ -15,11 +17,27 @@ if not TOKEN:
 if not OWNER_ID:
     raise ValueError("DEVELOPER_ID not found in .env")
 
+logging.basicConfig(
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    level=logging.INFO,
+    handlers=[
+        logging.FileHandler("bot.log", encoding="utf-8"),
+        logging.StreamHandler(),
+    ],
+)
+
+async def post_init(app):
+    scheduler.start()
+    restore_reminders(app.bot)
+    print(f"SoloLeveling Journal Bot started. Owner: {OWNER_ID}")
+    print(f"Reminders loaded and scheduler running.")
+
 def main():
-    app = ApplicationBuilder().token(TOKEN).build()
+    app = ApplicationBuilder().token(TOKEN).post_init(post_init).build()
+
     for h in get_handlers():
         app.add_handler(h)
-    print(f"Bot started. Owner: {OWNER_ID}")
+
     app.run_polling()
 
 if __name__ == "__main__":

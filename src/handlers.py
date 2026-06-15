@@ -1,45 +1,274 @@
 import os
-from datetime import date
-from telegram import Update
-from telegram.ext import ContextTypes, CommandHandler, MessageHandler, filters
+import re
+import asyncio
+from datetime import date, datetime, timedelta
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import ContextTypes, CommandHandler, MessageHandler, CallbackQueryHandler, filters
+from telegram.helpers import escape_markdown
 
 from src import storage
+from src import scheduler as sched
 
 OWNER_ID = int(os.getenv("DEVELOPER_ID", "0"))
+
 
 def _is_owner(update: Update) -> bool:
     return update.effective_user.id == OWNER_ID
 
+def safe_delete_message(message):
+    if not message:
+        return
+    async def _delete():
+        try:
+            await message.delete()
+        except Exception:
+            pass
+    asyncio.create_task(_delete())
+
+
 def _fmt_entry(e: dict) -> str:
-    return f"  #{e['id']}  [{e['time']}]  {e['text']}"
+    return f"  \\#{e['id']}  \\[{escape_markdown(e['time'], version=2)}\\]  {escape_markdown(e['text'], version=2)}"
+
 
 def _fmt_entries(entries: list, title: str = None) -> str:
     if not entries:
-        return f"<b>{title}</b>\n\nTidak ada catatan." if title else "Tidak ada catatan."
-    lines = [f"<b>{title}</b>\n"] if title else []
+        base = f"{escape_markdown(title, version=2)}\n\nTidak ada catatan\\." if title else "Tidak ada catatan\\."
+        return base + "\n\n_Ketik atau kirim pesan langsung untuk mencatat_"
+    lines = [f"*{escape_markdown(title, version=2)}*\n"] if title else []
     for e in entries:
         lines.append(_fmt_entry(e))
     return "\n".join(lines)
 
+
+def _menu_keyboard():
+    keyboard = [
+        [
+            InlineKeyboardButton("📝 Log Aktivitas", callback_data="menu_log"),
+            InlineKeyboardButton("📅 Agenda Hari Ini", callback_data="menu_agenda"),
+        ],
+        [
+            InlineKeyboardButton("🔍 Cari Log", callback_data="menu_search"),
+            InlineKeyboardButton("🗂️ Arsip Harian", callback_data="menu_all"),
+        ],
+        [
+            InlineKeyboardButton("⏰ Pengingat", callback_data="menu_reminder"),
+            InlineKeyboardButton("📈 Statistik Hunter", callback_data="menu_stats"),
+        ],
+        [
+            InlineKeyboardButton("🗑️ Hapus Log", callback_data="menu_clear"),
+            InlineKeyboardButton("🔄 Restart Bot", callback_data="menu_restart"),
+        ],
+        [
+            InlineKeyboardButton("❓ Panduan", callback_data="menu_help"),
+        ]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+
+def get_agenda_text(chat_id: int) -> str:
+    logs = storage.get_today()
+    all_reminders = sched.get_reminders(chat_id)
+    today_str = date.today().isoformat()
+    
+    # Filter reminders for today
+    today_reminders = []
+    for r in all_reminders:
+        if r.get("repeat") == "daily":
+            today_reminders.append(r)
+        else:
+            r_date = r.get("remind_at", "").split("T")[0]
+            if r_date == today_str:
+                today_reminders.append(r)
+                
+    # Sort logs by time (HH:MM:SS)
+    logs_sorted = sorted(logs, key=lambda x: x.get("time", ""))
+    
+    # Sort reminders by time
+    def get_reminder_time(r):
+        time_part = r.get("remind_at", "").split("T")[1]
+        return time_part[:5] # HH:MM
+        
+    reminders_sorted = sorted(today_reminders, key=get_reminder_time)
+    
+    # Format the message beautifully
+    escaped_date = escape_markdown(today_str, version=2)
+    lines = [
+        "╔════════════════════════╗",
+        "⚔️   *DAILY QUEST AGENDA*   ⚔️",
+        "╚════════════════════════╝",
+        f"📅 *Tanggal:* `{escaped_date}`\n",
+        "🔴 *ACTIVE QUESTS \\(Reminders\\):*"
+    ]
+    
+    if not reminders_sorted:
+        lines.append("  _Tidak ada agenda/pengingat untuk hari ini\\._")
+    else:
+        for r in reminders_sorted:
+            r_time = escape_markdown(get_reminder_time(r), version=2)
+            r_text = escape_markdown(r["text"], version=2)
+            lines.append(f"  ⏳ `[{r_time}]` {r_text}")
+            
+    lines.append("\n🟢 *CLEARED QUESTS \\(Aktivitas Tercatat\\):*")
+    if not logs_sorted:
+        lines.append("  _Belum ada aktivitas yang dicatat hari ini\\._")
+    else:
+        for l in logs_sorted:
+            l_time = escape_markdown(l.get("time", "")[:5], version=2)
+            l_text = escape_markdown(l.get("text", ""), version=2)
+            lines.append(f"  ✅ `[{l_time}]` {l_text}")
+            
+    lines.append("\n━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    lines.append("_Ketik langsung pesan untuk mencatat log harian_")
+    
+    return "\n".join(lines)
+
+
 async def start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not _is_owner(update):
-        await update.message.reply_text("Bot ini pribadi.")
+        await update.message.reply_text("⛔ Bot ini pribadi.")
         return
     text = (
-        "<b>SoloLeveling Journal</b>\n\n"
-        "Catat semua aktivitas kerja mu disini.\n\n"
-        "<b>Commands:</b>\n"
-        "/log &lt;text&gt;  — Catat kegiatan\n"
-        "/today  — Lihat catatan hari ini\n"
-        "/yesterday  — Lihat catatan kemarin\n"
-        "/date YYYY-MM-DD  — Lihat catatan tanggal tertentu\n"
-        "/search &lt;kata&gt;  — Cari catatan\n"
-        "/all  — Semua tanggal\n"
-        "/stats  — Statistik\n"
-        "/del &lt;id&gt;  — Hapus catatan\n\n"
-        "<i>Atau kirim pesan langsung, otomatis tersimpan.</i>"
+        "╔════════════════════════╗\n"
+        "   ⚔️  *SOLO LEVELING JOURNAL*  ⚔️   \n"
+        "╚════════════════════════╝\n\n"
+        "Selamat datang, *Hunter*\\. Ini adalah log harian pribadi Anda\\.\n"
+        "Setiap tugas, aktivitas, dan langkah perjalanan Anda akan direkam di sini\\.\n\n"
+        "*Arise\\!* Mulai pencatatan Anda sekarang\\."
     )
-    await update.message.reply_text(text, parse_mode="HTML")
+    await update.message.reply_text(text, parse_mode="MarkdownV2", reply_markup=_menu_keyboard())
+
+
+async def menu_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    data = query.data
+
+    if data == "menu_start":
+        text = (
+            "╔════════════════════════╗\n"
+            "   ⚔️  *SOLO LEVELING JOURNAL*  ⚔️   \n"
+            "╚════════════════════════╝\n\n"
+            "Selamat datang, *Hunter*\\. Ini adalah log harian pribadi Anda\\.\n"
+            "Setiap tugas, aktivitas, dan langkah perjalanan Anda akan direkam di sini\\.\n\n"
+            "*Arise\\!* Mulai pencatatan Anda sekarang\\."
+        )
+        await query.edit_message_text(text, parse_mode="MarkdownV2", reply_markup=_menu_keyboard())
+    elif data == "menu_log":
+        await query.edit_message_text(
+            "📝 *Log Aktivitas*\n\nKetik langsung pesan atau gunakan:\n`/log <aktivitas>` untuk mencatat kegiatan baru\\.",
+            parse_mode="MarkdownV2",
+            reply_markup=_menu_keyboard(),
+        )
+    elif data == "menu_agenda":
+        msg = get_agenda_text(update.effective_user.id)
+        await query.edit_message_text(msg, parse_mode="MarkdownV2", reply_markup=_menu_keyboard())
+    elif data == "menu_today":
+        entries = storage.get_today()
+        today_str = date.today().isoformat()
+        msg = _fmt_entries(entries, f"Hari Ini ({today_str})")
+        if len(msg) > 4000:
+            msg = msg[:4000] + "\n\n... (terlalu panjang)"
+        await query.edit_message_text(msg, parse_mode="MarkdownV2", reply_markup=_menu_keyboard())
+    elif data == "menu_date":
+        await query.edit_message_text(
+            "📅 *Cari Tanggal*\n\nGunakan:\n`/date YYYY-MM-DD`",
+            parse_mode="MarkdownV2",
+            reply_markup=_menu_keyboard(),
+        )
+    elif data == "menu_search":
+        await query.edit_message_text(
+            "🔍 *Cari Log*\n\nGunakan:\n`/search <kata kunci>` untuk mencari catatan lama\\.",
+            parse_mode="MarkdownV2",
+            reply_markup=_menu_keyboard(),
+        )
+    elif data == "menu_reminder":
+        reminders = sched.get_reminders(update.effective_user.id)
+        if reminders:
+            lines = ["⏰ *Reminder Aktif*\n"]
+            for r in reminders:
+                rid = r['id']
+                rt = escape_markdown(r['remind_at'][:16], version=2)
+                rtext = escape_markdown(r['text'], version=2)
+                repeat = f" (_{escape_markdown(r['repeat'], version=2)}_)" if r['repeat'] else ""
+                lines.append(f"  #{rid}  {rt}{repeat}  {rtext}")
+            lines.append("\n\nGunakan `/reminders` untuk kelola")
+            msg = "\n".join(lines)
+        else:
+            msg = "⏰ *Reminder*\n\nBelum ada reminder aktif\\.\n\nGunakan:\n`/remind <HH:MM> <pesan>` untuk reminder harian\n`/remindat <YYYY-MM-DD HH:MM> <pesan>` untuk sekali"
+        await query.edit_message_text(msg, parse_mode="MarkdownV2", reply_markup=_menu_keyboard())
+    elif data == "menu_stats":
+        s = storage.get_stats()
+        if s["total"] == 0:
+            msg = "Belum ada catatan\\."
+        else:
+            msg = (
+                f"📈 *Statistik Hunter*\n\n"
+                f"Total catatan: {s['total']}\n"
+                f"Total hari aktif: {s['days']}\n"
+                f"Pertama: {escape_markdown(s['first_date'], version=2)}\n"
+                f"Terakhir: {escape_markdown(s['last_date'], version=2)}"
+            )
+        await query.edit_message_text(msg, parse_mode="MarkdownV2", reply_markup=_menu_keyboard())
+    elif data == "menu_all":
+        dates = storage.get_all_dates()
+        if not dates:
+            msg = "Belum ada catatan\\."
+        else:
+            total = storage.get_entry_count()
+            lines = [f"🗂️ *Arsip Harian ({total} catatan)*\n"]
+            for d, count in dates:
+                lines.append(f"  {escape_markdown(d, version=2)}  \\({count}\\)")
+            msg = "\n".join(lines)
+        await query.edit_message_text(msg, parse_mode="MarkdownV2", reply_markup=_menu_keyboard())
+    elif data == "menu_clear":
+        keyboard = [
+            [
+                InlineKeyboardButton("🗑️ Ya, Hapus Semua", callback_data="menu_clear_confirm"),
+                InlineKeyboardButton("❌ Batal", callback_data="menu_start"),
+            ]
+        ]
+        await query.edit_message_text(
+            "⚠️ *Peringatan\\!* Apakah Anda yakin ingin menghapus semua catatan log? Tindakan ini tidak dapat dibatalkan\\.",
+            parse_mode="MarkdownV2",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+    elif data == "menu_clear_confirm":
+        storage.clear_all()
+        await query.edit_message_text(
+            "✅ *Semua log berhasil dihapus\\!* Data jurnal telah dibersihkan\\.",
+            parse_mode="MarkdownV2",
+            reply_markup=_menu_keyboard()
+        )
+    elif data == "menu_restart":
+        await query.edit_message_text("🔄 *Memulai ulang bot... Arise\\!*", parse_mode="MarkdownV2")
+        await asyncio.sleep(1)
+        import sys
+        import os
+        os.execv(sys.executable, [sys.executable] + sys.argv)
+    elif data == "menu_help":
+        text = (
+            "⚔️ *SoloLeveling Journal* ⚔️\n\n"
+            "*Commands:*\n"
+            "`/start` — Menu utama\n"
+            "`/agenda` — Tampilkan agenda hari ini\n"
+            "`/log <teks>` — Catat kegiatan manual\n"
+            "`/today` — Lihat catatan hari ini\n"
+            "`/yesterday` — Lihat catatan kemarin\n"
+            "`/date YYYY-MM-DD` — Catatan tanggal tertentu\n"
+            "`/search <kata>` — Cari catatan lama\n"
+            "`/all` — Tampilkan arsip tanggal\n"
+            "`/stats` — Statistik Hunter\n"
+            "`/del <id>` — Hapus catatan\n"
+            "`/clear` — Hapus semua log catatan\n"
+            "`/restart` — Memulai ulang bot (refresh)\n"
+            "`/remind <HH:MM> <pesan>` — Reminder harian\n"
+            "`/remindat <YYYY-MM-DD HH:MM> <pesan>` — Reminder sekali\n"
+            "`/reminders` — Daftar reminder aktif\n"
+            "`/unremind <id>` — Hapus reminder\n\n"
+            "Atau kirim pesan langsung untuk mencatat log harian secara instan\\."
+        )
+        await query.edit_message_text(text, parse_mode="MarkdownV2", reply_markup=_menu_keyboard())
+
 
 async def cmd_log(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not _is_owner(update):
@@ -48,43 +277,62 @@ async def cmd_log(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not text:
         await update.message.reply_text("Gunakan: /log <teks kegiatan>")
         return
+    
+    # Hapus pesan perintah /log dari user di background agar instan
+    safe_delete_message(update.message)
+
     entry = storage.add_entry(text)
-    await update.message.reply_text(
-        f"Disimpan:\n{_fmt_entry(entry)}",
-        parse_mode="HTML"
-    )
+    msg = f"✅ *Tersimpan*\n{_fmt_entry(entry)}"
+    await update.message.reply_text(msg, parse_mode="MarkdownV2", reply_markup=_menu_keyboard())
+
+
+async def cmd_agenda(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not _is_owner(update):
+        return
+    safe_delete_message(update.message)
+    msg = get_agenda_text(update.effective_user.id)
+    await update.message.reply_text(msg, parse_mode="MarkdownV2", reply_markup=_menu_keyboard())
+
 
 async def cmd_today(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not _is_owner(update):
         return
+    safe_delete_message(update.message)
     entries = storage.get_today()
     today_str = date.today().isoformat()
-    msg = _fmt_entries(entries, f"Catatan Hari Ini ({today_str})")
-    await update.message.reply_text(msg, parse_mode="HTML")
+    msg = _fmt_entries(entries, f"Hari Ini ({today_str})")
+    if len(msg) > 4000:
+        msg = msg[:4000] + "\n\n... (terlalu panjang)"
+    await update.message.reply_text(msg, parse_mode="MarkdownV2", reply_markup=_menu_keyboard())
+
 
 async def cmd_yesterday(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not _is_owner(update):
         return
+    safe_delete_message(update.message)
     entries = storage.get_yesterday()
-    from datetime import timedelta
     yesterday_str = (date.today() - timedelta(days=1)).isoformat()
     msg = _fmt_entries(entries, f"Kemarin ({yesterday_str})")
-    await update.message.reply_text(msg, parse_mode="HTML")
+    await update.message.reply_text(msg, parse_mode="MarkdownV2", reply_markup=_menu_keyboard())
+
 
 async def cmd_date(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not _is_owner(update):
         return
+    safe_delete_message(update.message)
     d = " ".join(ctx.args)
     if not d:
         await update.message.reply_text("Gunakan: /date YYYY-MM-DD")
         return
     entries = storage.get_by_date(d)
     msg = _fmt_entries(entries, f"Catatan ({d})")
-    await update.message.reply_text(msg, parse_mode="HTML")
+    await update.message.reply_text(msg, parse_mode="MarkdownV2", reply_markup=_menu_keyboard())
+
 
 async def cmd_search(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not _is_owner(update):
         return
+    safe_delete_message(update.message)
     kw = " ".join(ctx.args)
     if not kw:
         await update.message.reply_text("Gunakan: /search <kata kunci>")
@@ -96,49 +344,187 @@ async def cmd_search(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     msg = _fmt_entries(results, f"Hasil pencarian: {kw} ({len(results)})")
     if len(msg) > 4000:
         msg = msg[:4000] + "\n\n... (terlalu panjang)"
-    await update.message.reply_text(msg, parse_mode="HTML")
+    await update.message.reply_text(msg, parse_mode="MarkdownV2", reply_markup=_menu_keyboard())
+
 
 async def cmd_all(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not _is_owner(update):
         return
+    safe_delete_message(update.message)
     dates = storage.get_all_dates()
     if not dates:
-        await update.message.reply_text("Belum ada catatan.")
+        await update.message.reply_text("Belum ada catatan\\.", parse_mode="MarkdownV2")
         return
     total = storage.get_entry_count()
-    lines = [f"<b>Semua Tanggal ({total} catatan)</b>\n"]
+    lines = [f"🗂️ *Semua Tanggal \\({total} catatan\\)*\n"]
     for d, count in dates:
-        lines.append(f"  {d}  ({count})")
-    await update.message.reply_text("\n".join(lines), parse_mode="HTML")
+        lines.append(f"  {escape_markdown(d, version=2)}  \\({count}\\)")
+    msg = "\n".join(lines)
+    await update.message.reply_text(msg, parse_mode="MarkdownV2", reply_markup=_menu_keyboard())
+
 
 async def cmd_stats(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not _is_owner(update):
         return
+    safe_delete_message(update.message)
     s = storage.get_stats()
     if s["total"] == 0:
-        await update.message.reply_text("Belum ada catatan.")
+        await update.message.reply_text("Belum ada catatan\\.", parse_mode="MarkdownV2")
         return
-    text = (
-        f"<b>Statistik Journal</b>\n\n"
+    msg = (
+        f"📈 *Statistik Hunter*\n\n"
         f"Total catatan: {s['total']}\n"
-        f"Total hari: {s['days']}\n"
-        f"Pertama: {s['first_date']}\n"
-        f"Terakhir: {s['last_date']}"
+        f"Total hari aktif: {s['days']}\n"
+        f"Pertama: {escape_markdown(s['first_date'], version=2)}\n"
+        f"Terakhir: {escape_markdown(s['last_date'], version=2)}"
     )
-    await update.message.reply_text(text, parse_mode="HTML")
+    await update.message.reply_text(msg, parse_mode="MarkdownV2", reply_markup=_menu_keyboard())
+
 
 async def cmd_del(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not _is_owner(update):
         return
+    safe_delete_message(update.message)
     try:
         eid = int(" ".join(ctx.args))
     except (ValueError, IndexError):
         await update.message.reply_text("Gunakan: /del <id catatan>")
         return
     if storage.delete_entry(eid):
-        await update.message.reply_text(f"Catatan #{eid} dihapus.")
+        await update.message.reply_text(f"Catatan #{eid} deleted.")
     else:
         await update.message.reply_text(f"Catatan #{eid} tidak ditemukan.")
+
+
+async def cmd_clear(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not _is_owner(update):
+        return
+    safe_delete_message(update.message)
+    keyboard = [
+        [
+            InlineKeyboardButton("🗑️ Ya, Hapus Semua", callback_data="menu_clear_confirm"),
+            InlineKeyboardButton("❌ Batal", callback_data="menu_start"),
+        ]
+    ]
+    await update.message.reply_text(
+        "⚠️ *Peringatan\\!* Apakah Anda yakin ingin menghapus semua catatan log? Tindakan ini tidak dapat dibatalkan\\.",
+        parse_mode="MarkdownV2",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+
+async def cmd_restart(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not _is_owner(update):
+        return
+    safe_delete_message(update.message)
+    await update.message.reply_text("🔄 *Memulai ulang bot... Arise\\!*", parse_mode="MarkdownV2")
+    await asyncio.sleep(1)
+    import sys
+    import os
+    os.execv(sys.executable, [sys.executable] + sys.argv)
+
+
+async def cmd_remind(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not _is_owner(update):
+        return
+    args = " ".join(ctx.args)
+    if not args:
+        await update.message.reply_text(
+            "Gunakan: /remind <HH:MM> <pesan>\nContoh: `/remind 09:00 Minum kopi`",
+            parse_mode="MarkdownV2",
+        )
+        return
+    match = re.match(r"^(\d{1,2}):(\d{2})\s+(.+)", args)
+    if not match:
+        await update.message.reply_text("Format salah. Gunakan: `/remind 09:00 pesan`", parse_mode="MarkdownV2")
+        return
+    hour, minute, text = int(match.group(1)), int(match.group(2)), match.group(3)
+    now = datetime.now()
+    remind_at = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    if remind_at <= now:
+        remind_at += timedelta(days=1)
+    entry = sched.add_reminder(
+        bot=ctx.bot,
+        chat_id=update.effective_user.id,
+        text=text,
+        remind_at=remind_at,
+        repeat="daily",
+    )
+    rt = remind_at.strftime("%H:%M")
+    await update.message.reply_text(
+        f"✅ Reminder harian diatur setiap {rt}\n_{escape_markdown(text, version=2)}_",
+        parse_mode="MarkdownV2",
+        reply_markup=_menu_keyboard(),
+    )
+
+
+async def cmd_remindat(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not _is_owner(update):
+        return
+    args = " ".join(ctx.args)
+    if not args:
+        await update.message.reply_text(
+            "Gunakan: /remindat <YYYY-MM-DD HH:MM> <pesan>\n"
+            "Contoh: `/remindat 2026-06-16 14:30 Meeting`",
+            parse_mode="MarkdownV2",
+        )
+        return
+    match = re.match(r"^(\d{4}-\d{2}-\d{2})\s+(\d{1,2}):(\d{2})\s+(.+)", args)
+    if not match:
+        await update.message.reply_text("Format salah.")
+        return
+    date_str, hour, minute, text = match.group(1), int(match.group(2)), int(match.group(3)), match.group(4)
+    try:
+        remind_at = datetime.strptime(f"{date_str} {hour}:{minute}", "%Y-%m-%d %H:%M")
+    except ValueError:
+        await update.message.reply_text("Tanggal tidak valid.")
+        return
+    entry = sched.add_reminder(
+        bot=ctx.bot,
+        chat_id=update.effective_user.id,
+        text=text,
+        remind_at=remind_at,
+        repeat=None,
+    )
+    rt = remind_at.strftime("%Y-%m-%d %H:%M")
+    await update.message.reply_text(
+        f"✅ Reminder diatur pada {rt}\n_{escape_markdown(text, version=2)}_",
+        parse_mode="MarkdownV2",
+        reply_markup=_menu_keyboard(),
+    )
+
+
+async def cmd_reminders(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not _is_owner(update):
+        return
+    reminders = sched.get_reminders(update.effective_user.id)
+    if not reminders:
+        await update.message.reply_text("Tidak ada reminder aktif.")
+        return
+    lines = ["⏰ *Reminder Aktif*\n"]
+    for r in reminders:
+        rid = r['id']
+        rt = escape_markdown(r['remind_at'][:16], version=2)
+        rtext = escape_markdown(r['text'], version=2)
+        repeat = f" (_{escape_markdown(r['repeat'], version=2)}_)" if r['repeat'] else ""
+        lines.append(f"  #{rid}  {rt}{repeat}  {rtext}")
+    lines.append("\nGunakan `/unremind <id>` untuk menghapus")
+    await update.message.reply_text("\n".join(lines), parse_mode="MarkdownV2")
+
+
+async def cmd_unremind(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not _is_owner(update):
+        return
+    try:
+        rid = int(" ".join(ctx.args))
+    except (ValueError, IndexError):
+        await update.message.reply_text("Gunakan: /unremind <id>")
+        return
+    if sched.remove_reminder(rid):
+        await update.message.reply_text(f"Reminder #{rid} dihapus.")
+    else:
+        await update.message.reply_text(f"Reminder #{rid} tidak ditemukan.")
+
 
 async def auto_log(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not _is_owner(update):
@@ -146,15 +532,19 @@ async def auto_log(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     if not text:
         return
+
+    # Hapus pesan teks langsung dari user di background agar instan
+    safe_delete_message(update.message)
+
     entry = storage.add_entry(text)
-    await update.message.reply_text(
-        f"Disimpan:\n{_fmt_entry(entry)}",
-        parse_mode="HTML"
-    )
+    msg = f"✅ *Tersimpan*\n{_fmt_entry(entry)}"
+    await update.message.reply_text(msg, parse_mode="MarkdownV2", reply_markup=_menu_keyboard())
+
 
 def get_handlers():
     return [
         CommandHandler("start", start),
+        CommandHandler("agenda", cmd_agenda),
         CommandHandler("log", cmd_log),
         CommandHandler("today", cmd_today),
         CommandHandler("yesterday", cmd_yesterday),
@@ -163,5 +553,12 @@ def get_handlers():
         CommandHandler("all", cmd_all),
         CommandHandler("stats", cmd_stats),
         CommandHandler("del", cmd_del),
+        CommandHandler("clear", cmd_clear),
+        CommandHandler("restart", cmd_restart),
+        CommandHandler("remind", cmd_remind),
+        CommandHandler("remindat", cmd_remindat),
+        CommandHandler("reminders", cmd_reminders),
+        CommandHandler("unremind", cmd_unremind),
+        CallbackQueryHandler(menu_callback, pattern="^menu_"),
         MessageHandler(filters.TEXT & ~filters.COMMAND, auto_log),
     ]

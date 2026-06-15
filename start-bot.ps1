@@ -7,8 +7,8 @@ $BotDir = "D:\joblog"
 $ScriptName = "SoloLeveling"
 
 function Start-Bot {
-    Write-Host "[$ScriptName] Pulling latest..." -ForegroundColor Cyan
-    git -C $BotDir pull 2>&1 | Out-Null
+    Write-Host "[$ScriptName] Pulling latest in background..." -ForegroundColor Cyan
+    Start-Job -ScriptBlock { param($dir) git -C $dir pull } -ArgumentList $BotDir | Out-Null
 
     $proc = Get-Process -Name python -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -like "*bot.py*" -and $_.CommandLine -like "*joblog*" }
     if ($proc) {

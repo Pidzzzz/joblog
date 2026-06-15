@@ -17,6 +17,7 @@ A Telegram bot for personal daily journaling. Log your activities, search past e
 | Command | Description |
 |---------|-------------|
 | `/start` | Show help menu |
+| `/agenda` | View today's agenda (Active & Cleared Quests) |
 | `/log <text>` | Save a journal entry |
 | `/today` | View today's entries |
 | `/yesterday` | View yesterday's entries |
