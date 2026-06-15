@@ -205,7 +205,7 @@ async def menu_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(text, parse_mode="MarkdownV2", reply_markup=_menu_keyboard())
     elif data == "menu_log":
         await query.edit_message_text(
-            "📝 *Log Aktivitas*\n\nKetik langsung pesan atau gunakan:\n`/log <aktivitas>` untuk mencatat kegiatan baru\\.",
+            "📝 *Log Aktivitas*\n\nKetik langsung pesan atau gunakan:\n`/log \\<aktivitas\\>` untuk mencatat kegiatan baru\\.",
             parse_mode="MarkdownV2",
             reply_markup=_menu_keyboard(),
         )
@@ -227,7 +227,7 @@ async def menu_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         )
     elif data == "menu_search":
         await query.edit_message_text(
-            "🔍 *Cari Log*\n\nGunakan:\n`/search <kata kunci>` untuk mencari catatan lama\\.",
+            "🔍 *Cari Log*\n\nGunakan:\n`/search \\<kata kunci\\>` untuk mencari catatan lama\\.",
             parse_mode="MarkdownV2",
             reply_markup=_menu_keyboard(),
         )
@@ -244,7 +244,7 @@ async def menu_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             lines.append("\n\nGunakan `/reminders` untuk kelola")
             msg = "\n".join(lines)
         else:
-            msg = "⏰ *Reminder*\n\nBelum ada reminder aktif\\.\n\nGunakan:\n`/remind <HH:MM> <pesan>` untuk reminder harian\n`/remindat <YYYY-MM-DD HH:MM> <pesan>` untuk sekali"
+            msg = "⏰ *Reminder*\n\nBelum ada reminder aktif\\.\n\nGunakan:\n`/remind \\<HH:MM\\> \\<pesan\\>` untuk reminder harian\n`/remindat \\<YYYY-MM-DD HH:MM\\> \\<pesan\\>` untuk sekali"
         await query.edit_message_text(msg, parse_mode="MarkdownV2", reply_markup=_menu_keyboard())
     elif data == "menu_rank":
         s = storage.get_stats()
@@ -367,23 +367,23 @@ async def menu_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             "`/start` — Menu utama\n"
             "`/rank` — Cek Rank Hunter kamu\n"
             "`/agenda` — Tampilkan agenda hari ini\n"
-            "`/log <teks>` — Catat kegiatan manual\n"
+            "`/log \\<teks\\>` — Catat kegiatan manual\n"
             "`/today` — Lihat catatan hari ini\n"
             "`/yesterday` — Lihat catatan kemarin\n"
             "`/date YYYY-MM-DD` — Catatan tanggal tertentu\n"
-            "`/search <kata>` — Cari catatan lama\n"
+            "`/search \\<kata\\>` — Cari catatan lama\n"
             "`/all` — Tampilkan arsip tanggal\n"
             "`/stats` — Statistik Hunter\n"
             "`/rank` — Cek Rank Hunter\n"
             "`/export` — Export jurnal ke PDF\n"
             "`/export YYYY-MM-DD YYYY-MM-DD` — Export periode tertentu\n"
-            "`/del <id>` — Hapus catatan\n"
+            "`/del \\<id\\>` — Hapus catatan\n"
             "`/clear` — Hapus semua log catatan\n"
             "`/restart` — Memulai ulang bot (refresh)\n"
-            "`/remind <HH:MM> <pesan>` — Reminder harian\n"
-            "`/remindat <YYYY-MM-DD HH:MM> <pesan>` — Reminder sekali\n"
+            "`/remind \\<HH:MM\\> \\<pesan\\>` — Reminder harian\n"
+            "`/remindat \\<YYYY-MM-DD HH:MM\\> \\<pesan\\>` — Reminder sekali\n"
             "`/reminders` — Daftar reminder aktif\n"
-            "`/unremind <id>` — Hapus reminder\n\n"
+            "`/unremind \\<id\\>` — Hapus reminder\n\n"
             "Atau kirim pesan langsung untuk mencatat log harian secara instan\\."
         )
         await query.edit_message_text(text, parse_mode="MarkdownV2", reply_markup=_menu_keyboard())
@@ -394,7 +394,7 @@ async def cmd_log(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         return
     text = " ".join(ctx.args)
     if not text:
-        await update.message.reply_text("Gunakan: /log <teks kegiatan>")
+        await update.message.reply_text("Gunakan: /log \\<teks kegiatan\\>", parse_mode="MarkdownV2")
         return
     
     chat_id = update.effective_chat.id
@@ -451,7 +451,7 @@ async def cmd_date(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Gunakan: /date YYYY-MM-DD")
         return
     entries = storage.get_by_date(d)
-    msg = _fmt_entries(entries, f"Catatan ({d})")
+    msg = _fmt_entries(entries, f"Catatan \\({d}\\)")
     await update.message.reply_text(msg, parse_mode="MarkdownV2", reply_markup=_menu_keyboard())
 
 
@@ -461,7 +461,7 @@ async def cmd_search(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     safe_delete_message(update.message)
     kw = " ".join(ctx.args)
     if not kw:
-        await update.message.reply_text("Gunakan: /search <kata kunci>")
+        await update.message.reply_text("Gunakan: /search \\<kata kunci\\>", parse_mode="MarkdownV2")
         return
     results = storage.search(kw)
     if not results:
@@ -514,7 +514,7 @@ async def cmd_del(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     try:
         eid = int(" ".join(ctx.args))
     except (ValueError, IndexError):
-        await update.message.reply_text("Gunakan: /del <id catatan>")
+        await update.message.reply_text("Gunakan: /del \\<id catatan\\>", parse_mode="MarkdownV2")
         return
     if storage.delete_entry(eid):
         await update.message.reply_text(f"Catatan #{eid} deleted.")
@@ -575,7 +575,7 @@ async def cmd_remind(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     args = " ".join(ctx.args)
     if not args:
         await update.message.reply_text(
-            "Gunakan: /remind <HH:MM> <pesan>\nContoh: `/remind 09:00 Minum kopi`",
+            "Gunakan: /remind \\<HH:MM\\> \\<pesan\\>\nContoh: `/remind 09:00 Minum kopi`",
             parse_mode="MarkdownV2",
         )
         return
@@ -609,7 +609,7 @@ async def cmd_remindat(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     args = " ".join(ctx.args)
     if not args:
         await update.message.reply_text(
-            "Gunakan: /remindat <YYYY-MM-DD HH:MM> <pesan>\n"
+            "Gunakan: /remindat \\<YYYY-MM-DD HH:MM\\> \\<pesan\\>\n"
             "Contoh: `/remindat 2026-06-16 14:30 Meeting`",
             parse_mode="MarkdownV2",
         )
@@ -653,7 +653,7 @@ async def cmd_reminders(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         rtext = escape_markdown(r['text'], version=2)
         repeat = f" (_{escape_markdown(r['repeat'], version=2)}_)" if r['repeat'] else ""
         lines.append(f"  #{rid}  {rt}{repeat}  {rtext}")
-    lines.append("\nGunakan `/unremind <id>` untuk menghapus")
+    lines.append("\nGunakan `/unremind \\<id\\>` untuk menghapus")
     await update.message.reply_text("\n".join(lines), parse_mode="MarkdownV2")
 
 
@@ -663,7 +663,7 @@ async def cmd_unremind(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     try:
         rid = int(" ".join(ctx.args))
     except (ValueError, IndexError):
-        await update.message.reply_text("Gunakan: /unremind <id>")
+        await update.message.reply_text("Gunakan: /unremind \\<id\\>", parse_mode="MarkdownV2")
         return
     if sched.remove_reminder(rid):
         await update.message.reply_text(f"Reminder #{rid} dihapus.")
