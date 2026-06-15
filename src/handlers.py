@@ -16,16 +16,39 @@ OWNER_ID = int(os.getenv("DEVELOPER_ID", "0"))
 
 delete_selections = {}
 last_bot_messages = {}
+bot_message_history = {}
 user_reminder_state = {}
 
 
 async def _send_and_auto_delete(message, text, delay=3):
     msg = await message.reply_text(text)
+    chat_id = message.chat_id
+    if chat_id not in bot_message_history:
+        bot_message_history[chat_id] = []
+    bot_message_history[chat_id].append(msg.message_id)
     await asyncio.sleep(delay)
     try:
         await msg.delete()
+        if chat_id in bot_message_history and msg.message_id in bot_message_history[chat_id]:
+            bot_message_history[chat_id].remove(msg.message_id)
     except Exception:
         pass
+
+
+async def _delete_all_bot_messages(chat_id):
+    if chat_id in bot_message_history:
+        for msg_id in bot_message_history[chat_id]:
+            try:
+                await bot_message_history[chat_id].__class__.__name__
+            except Exception:
+                pass
+        bot_message_history[chat_id] = []
+    old_msg = last_bot_messages.get(chat_id)
+    if old_msg:
+        try:
+            await old_msg.delete()
+        except Exception:
+            pass
 
 
 def _is_owner(update: Update) -> bool:
@@ -173,13 +196,7 @@ async def start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
 
     safe_delete_message(update.message)
-
-    old_msg = last_bot_messages.get(chat_id)
-    if old_msg:
-        try:
-            await old_msg.delete()
-        except Exception:
-            pass
+    await _delete_all_bot_messages(chat_id)
 
     s = storage.get_stats()
     xp = get_xp_progress(s["total"])
