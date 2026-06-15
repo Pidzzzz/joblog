@@ -360,6 +360,25 @@ async def menu_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         import subprocess, sys
         subprocess.Popen([sys.executable] + sys.argv, cwd=os.path.dirname(os.path.abspath(__file__)) + "/..")
         os._exit(0)
+    elif data == "export_today":
+        today = date.today().isoformat()
+        await _generate_and_send_pdf(query, start_date=today, end_date=today)
+    elif data == "export_week":
+        week_ago = (date.today() - timedelta(days=7)).isoformat()
+        today = date.today().isoformat()
+        await _generate_and_send_pdf(query, start_date=week_ago, end_date=today)
+    elif data == "export_month":
+        first_day = date.today().replace(day=1).isoformat()
+        today = date.today().isoformat()
+        await _generate_and_send_pdf(query, start_date=first_day, end_date=today)
+    elif data == "export_all":
+        await _generate_and_send_pdf(query)
+    elif data == "export_custom":
+        await query.edit_message_text(
+            "✏️ *Custom Date Range*\n\nKetik:\n`/export YYYY\-MM\-DD YYYY\-MM\-DD`\n\nContoh:\n`/export 2026\-06\-01 2026\-06\-15`",
+            parse_mode="MarkdownV2",
+            reply_markup=_menu_keyboard(),
+        )
     elif data == "menu_help":
         text = (
             "⚔️ *SoloLeveling Journal* ⚔️\n\n"
@@ -676,46 +695,89 @@ async def cmd_export(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         return
     safe_delete_message(update.message)
 
-    msg = await update.message.reply_text("📄 *Generating PDF report\\.\\.\\.*", parse_mode="MarkdownV2")
+    args = " ".join(ctx.args)
+    if args:
+        match = re.match(r"^(\d{4}\-\d{2}\-\d{2})\s+(\d{4}\-\d{2}\-\d{2})$", args)
+        if match:
+            start_date = match.group(1)
+            end_date = match.group(2)
+            msg = await update.message.reply_text("📄 *Generating PDF report\\.\\.\\.*", parse_mode="MarkdownV2")
+            await _generate_and_send_pdf_custom(update.message, start_date, end_date)
+            return
 
+    keyboard = [
+        [InlineKeyboardButton("📅 Hari Ini", callback_data="export_today")],
+        [InlineKeyboardButton("📆 7 Hari Terakhir", callback_data="export_week")],
+        [InlineKeyboardButton("📋 Bulan Ini", callback_data="export_month")],
+        [InlineKeyboardButton("📚 Semua Data", callback_data="export_all")],
+        [InlineKeyboardButton("✏️ Custom Date", callback_data="export_custom")],
+        [InlineKeyboardButton("❌ Batal", callback_data="menu_start")],
+    ]
+    await update.message.reply_text(
+        "📄 *Export Jurnal ke PDF*\n\nPilih periode yang ingin di\\-export\\:",
+        parse_mode="MarkdownV2",
+        reply_markup=InlineKeyboardMarkup(keyboard),
+    )
+
+
+async def _generate_and_send_pdf_custom(message, start_date=None, end_date=None):
     try:
-        args = " ".join(ctx.args)
-        start_date = None
-        end_date = None
-
-        if args:
-            match = re.match(r"^(\d{4}-\d{2}-\d{2})\s+(\d{4}-\d{2}-\d{2})$", args)
-            if match:
-                start_date = match.group(1)
-                end_date = match.group(2)
-
-        output_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), f"journal_{date.today().isoformat()}.pdf")
+        today = date.today().isoformat()
+        output_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), f"journal_{today}.pdf")
         generate_pdf(start_date=start_date, end_date=end_date, output_path=output_path)
 
-        await msg.delete()
-
-        caption = f"Journal Report\n\n"
+        caption = "Journal Report\n\n"
         if start_date and end_date:
             caption += f"Period: {start_date} to {end_date}\n"
-        else:
-            caption += f"All entries\n"
         caption += f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}"
 
         with open(output_path, "rb") as f:
-            await update.message.reply_document(
+            await message.reply_document(
                 document=f,
-                filename=f"journal_{date.today().isoformat()}.pdf",
+                filename=f"journal_{today}.pdf",
                 caption=caption,
             )
 
         os.remove(output_path)
 
     except Exception as e:
+        await message.reply_text(f"❌ Gagal generate PDF: {str(e)}")
+
+
+async def _generate_and_send_pdf(query, start_date=None, end_date=None):
+    await query.edit_message_text("📄 *Generating PDF report\\.\\.\\.*", parse_mode="MarkdownV2")
+
+    try:
+        today = date.today().isoformat()
+        output_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), f"journal_{today}.pdf")
+        generate_pdf(start_date=start_date, end_date=end_date, output_path=output_path)
+
+        caption = "Journal Report\n\n"
+        if start_date and end_date:
+            caption += f"Period: {start_date} to {end_date}\n"
+        elif start_date:
+            caption += f"From: {start_date}\n"
+        elif end_date:
+            caption += f"Until: {end_date}\n"
+        else:
+            caption += "All entries\n"
+        caption += f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+
+        with open(output_path, "rb") as f:
+            await query.message.reply_document(
+                document=f,
+                filename=f"journal_{today}.pdf",
+                caption=caption,
+            )
+
+        os.remove(output_path)
+        await query.delete_message()
+
+    except Exception as e:
         try:
-            await msg.delete()
+            await query.edit_message_text(f"❌ Gagal generate PDF: {str(e)}")
         except Exception:
             pass
-        await update.message.reply_text(f"❌ Gagal generate PDF: {str(e)}")
 
 
 async def cmd_rank(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -804,6 +866,6 @@ def get_handlers():
         CommandHandler("remindat", cmd_remindat),
         CommandHandler("reminders", cmd_reminders),
         CommandHandler("unremind", cmd_unremind),
-        CallbackQueryHandler(menu_callback, pattern="^menu_"),
+        CallbackQueryHandler(menu_callback, pattern="^(menu_|export_)"),
         MessageHandler(filters.TEXT & ~filters.COMMAND, auto_log),
     ]
