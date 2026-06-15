@@ -12,6 +12,8 @@ from src.ranks import get_rank, get_xp_progress, get_streak_info, format_progres
 
 OWNER_ID = int(os.getenv("DEVELOPER_ID", "0"))
 
+delete_selections = {}
+
 
 def _is_owner(update: Update) -> bool:
     return update.effective_user.id == OWNER_ID
@@ -65,6 +67,31 @@ def _menu_keyboard():
         ]
     ]
     return InlineKeyboardMarkup(keyboard)
+
+
+async def _show_delete_list(query, entries, selected, user_id):
+    lines = [f"🗑️ *Hapus Log* \\({len(entries)} catatan hari ini\\)\n"]
+    lines.append("_Pilih log yang ingin dihapus, lalu tekan *Hapus Terpilih*_\n")
+    for e in entries:
+        check = "✅" if e["id"] in selected else "⬜"
+        t = escape_markdown(e["time"][:5], version=2)
+        txt = escape_markdown(e["text"], version=2)
+        lines.append(f"{check} `#{e['id']}` `[{t}]` {txt}")
+    msg = "\n".join(lines)
+
+    keyboard = []
+    for e in entries:
+        label = f"{'✅' if e['id'] in selected else '⬜'} #{e['id']} {e['time'][:5]}"
+        keyboard.append([InlineKeyboardButton(label, callback_data=f"toggle_del_{e['id']}")])
+
+    btn_row = []
+    if selected:
+        btn_row.append(InlineKeyboardButton(f"🗑️ Hapus ({len(selected)})", callback_data="delete_selected"))
+    btn_row.append(InlineKeyboardButton("🗑️ Hapus Semua", callback_data="delete_all_today"))
+    btn_row.append(InlineKeyboardButton("❌ Batal", callback_data="menu_start"))
+    keyboard.append(btn_row)
+
+    await query.edit_message_text(msg, parse_mode="MarkdownV2", reply_markup=InlineKeyboardMarkup(keyboard))
 
 
 def get_agenda_text(chat_id: int) -> str:
@@ -263,18 +290,48 @@ async def menu_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             msg = "\n".join(lines)
         await query.edit_message_text(msg, parse_mode="MarkdownV2", reply_markup=_menu_keyboard())
     elif data == "menu_clear":
-        keyboard = [
-            [
-                InlineKeyboardButton("🗑️ Ya, Hapus Semua", callback_data="menu_clear_confirm"),
-                InlineKeyboardButton("❌ Batal", callback_data="menu_start"),
-            ]
-        ]
+        entries = storage.get_today()
+        if not entries:
+            await query.edit_message_text(
+                "🗑️ *Hapus Log*\n\nTidak ada catatan hari ini\\.",
+                parse_mode="MarkdownV2",
+                reply_markup=_menu_keyboard()
+            )
+            return
+        delete_selections[update.effective_user.id] = {"selected": set(), "entries": entries}
+        await _show_delete_list(query, entries, set(), update.effective_user.id)
+    elif data.startswith("toggle_del_"):
+        eid = int(data.split("_")[-1])
+        uid = update.effective_user.id
+        sel = delete_selections.get(uid, {"selected": set(), "entries": storage.get_today()})
+        if eid in sel["selected"]:
+            sel["selected"].discard(eid)
+        else:
+            sel["selected"].add(eid)
+        delete_selections[uid] = sel
+        await _show_delete_list(query, sel["entries"], sel["selected"], uid)
+    elif data == "delete_selected":
+        uid = update.effective_user.id
+        sel = delete_selections.pop(uid, None)
+        if not sel or not sel["selected"]:
+            await query.edit_message_text(
+                "Tidak ada log yang dipilih\\.",
+                parse_mode="MarkdownV2",
+                reply_markup=_menu_keyboard()
+            )
+            return
+        count = 0
+        for eid in sel["selected"]:
+            if storage.delete_entry(eid):
+                count += 1
         await query.edit_message_text(
-            "⚠️ *Peringatan\\!* Apakah Anda yakin ingin menghapus semua catatan log? Tindakan ini tidak dapat dibatalkan\\.",
+            f"✅ *{count} log berhasil dihapus\\!*",
             parse_mode="MarkdownV2",
-            reply_markup=InlineKeyboardMarkup(keyboard)
+            reply_markup=_menu_keyboard()
         )
-    elif data == "menu_clear_confirm":
+    elif data == "delete_all_today":
+        uid = update.effective_user.id
+        delete_selections.pop(uid, None)
         storage.clear_all()
         await query.edit_message_text(
             "✅ *Semua log berhasil dihapus\\!* Data jurnal telah dibersihkan\\.",
@@ -443,17 +500,33 @@ async def cmd_clear(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not _is_owner(update):
         return
     safe_delete_message(update.message)
-    keyboard = [
-        [
-            InlineKeyboardButton("🗑️ Ya, Hapus Semua", callback_data="menu_clear_confirm"),
-            InlineKeyboardButton("❌ Batal", callback_data="menu_start"),
-        ]
+    entries = storage.get_today()
+    if not entries:
+        await update.message.reply_text(
+            "🗑️ *Hapus Log*\n\nTidak ada catatan hari ini\\.",
+            parse_mode="MarkdownV2",
+            reply_markup=_menu_keyboard()
+        )
+        return
+    delete_selections[update.effective_user.id] = {"selected": set(), "entries": entries}
+    lines = [f"🗑️ *Hapus Log* \\({len(entries)} catatan hari ini\\)\n"]
+    lines.append("_Pilih log yang ingin dihapus, lalu tekan *Hapus Terpilih*_\n")
+    for e in entries:
+        t = escape_markdown(e["time"][:5], version=2)
+        txt = escape_markdown(e["text"], version=2)
+        lines.append(f"⬜ `#{e['id']}` `[{t}]` {txt}")
+    msg = "\n".join(lines)
+
+    keyboard = []
+    for e in entries:
+        keyboard.append([InlineKeyboardButton(f"⬜ #{e['id']} {e['time'][:5]}", callback_data=f"toggle_del_{e['id']}")])
+    btn_row = [
+        InlineKeyboardButton("🗑️ Hapus Semua", callback_data="delete_all_today"),
+        InlineKeyboardButton("❌ Batal", callback_data="menu_start"),
     ]
-    await update.message.reply_text(
-        "⚠️ *Peringatan\\!* Apakah Anda yakin ingin menghapus semua catatan log? Tindakan ini tidak dapat dibatalkan\\.",
-        parse_mode="MarkdownV2",
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
+    keyboard.append(btn_row)
+
+    await update.message.reply_text(msg, parse_mode="MarkdownV2", reply_markup=InlineKeyboardMarkup(keyboard))
 
 
 async def cmd_restart(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
