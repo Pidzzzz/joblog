@@ -19,7 +19,15 @@ from src.helpers import (
 )
 
 
+def _track_command(update: Update):
+    bot_stats["messages_received"] += 1
+    bot_stats["commands_used"] += 1
+    if bot_stats["start_time"] is None:
+        bot_stats["start_time"] = datetime.now()
+
+
 async def start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    _track_command(update)
     if not _is_owner(update):
         await update.message.reply_text("⛔ Bot ini pribadi.")
         return
@@ -46,6 +54,7 @@ async def start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_log(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    _track_command(update)
     if not _is_owner(update):
         return
     text = " ".join(ctx.args)
@@ -88,6 +97,7 @@ async def _auto_delete_message(bot, chat_id, message_id, delay):
 
 
 async def cmd_agenda(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    _track_command(update)
     if not _is_owner(update):
         return
     safe_delete_message(update.message)
@@ -97,6 +107,7 @@ async def cmd_agenda(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_today(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    _track_command(update)
     if not _is_owner(update):
         return
     safe_delete_message(update.message)
@@ -109,6 +120,7 @@ async def cmd_today(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_yesterday(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    _track_command(update)
     if not _is_owner(update):
         return
     safe_delete_message(update.message)
@@ -119,6 +131,7 @@ async def cmd_yesterday(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_date(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    _track_command(update)
     if not _is_owner(update):
         return
     safe_delete_message(update.message)
@@ -132,6 +145,7 @@ async def cmd_date(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_search(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    _track_command(update)
     if not _is_owner(update):
         return
     safe_delete_message(update.message)
@@ -150,6 +164,7 @@ async def cmd_search(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_all(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    _track_command(update)
     if not _is_owner(update):
         return
     safe_delete_message(update.message)
@@ -166,6 +181,7 @@ async def cmd_all(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_stats(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    _track_command(update)
     if not _is_owner(update):
         return
     safe_delete_message(update.message)
@@ -184,6 +200,7 @@ async def cmd_stats(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_del(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    _track_command(update)
     if not _is_owner(update):
         return
     safe_delete_message(update.message)
@@ -199,6 +216,7 @@ async def cmd_del(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_clear(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    _track_command(update)
     if not _is_owner(update):
         return
     safe_delete_message(update.message)
@@ -232,6 +250,7 @@ async def cmd_clear(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_restart(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    _track_command(update)
     if not _is_owner(update):
         return
     safe_delete_message(update.message)
@@ -246,6 +265,7 @@ async def cmd_restart(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_remind(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    _track_command(update)
     if not _is_owner(update):
         return
     args = " ".join(ctx.args)
@@ -280,6 +300,7 @@ async def cmd_remind(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_remindat(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    _track_command(update)
     if not _is_owner(update):
         return
     args = " ".join(ctx.args)
@@ -316,6 +337,7 @@ async def cmd_remindat(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_reminders(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    _track_command(update)
     if not _is_owner(update):
         return
     reminders = sched.get_reminders(update.effective_user.id)
@@ -334,6 +356,7 @@ async def cmd_reminders(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_unremind(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    _track_command(update)
     if not _is_owner(update):
         return
     try:
@@ -348,6 +371,7 @@ async def cmd_unremind(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_rank(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    _track_command(update)
     if not _is_owner(update):
         return
     safe_delete_message(update.message)
@@ -390,6 +414,7 @@ async def cmd_rank(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_ai(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    _track_command(update)
     if not _is_owner(update):
         return
     safe_delete_message(update.message)
@@ -427,6 +452,7 @@ async def cmd_ai(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_export(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    _track_command(update)
     if not _is_owner(update):
         return
     safe_delete_message(update.message)
