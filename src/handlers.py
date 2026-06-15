@@ -188,6 +188,7 @@ async def menu_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     data = query.data
+    print(f"[DEBUG] Callback received: {data}")
 
     if data == "menu_start":
         s = storage.get_stats()
@@ -233,19 +234,86 @@ async def menu_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         )
     elif data == "menu_reminder":
         reminders = sched.get_reminders(update.effective_user.id)
+        keyboard = [
+            [InlineKeyboardButton("➕ Reminder Harian", callback_data="add_remind_daily")],
+            [InlineKeyboardButton("➕ Reminder Sekali", callback_data="add_remind_once")],
+        ]
+        if reminders:
+            keyboard.append([InlineKeyboardButton("📋 Lihat Semua Reminder", callback_data="list_reminders")])
+            for r in reminders:
+                rid = r['id']
+                rtext = r['text'][:20]
+                keyboard.append([InlineKeyboardButton(f"🗑️ #{rid} {rtext}", callback_data=f"del_remind_{rid}")])
+        keyboard.append([InlineKeyboardButton("❌ Kembali", callback_data="menu_start")])
+        
         if reminders:
             lines = ["⏰ *Reminder Aktif*\n"]
             for r in reminders:
                 rid = r['id']
                 rt = escape_markdown(r['remind_at'][:16], version=2)
                 rtext = escape_markdown(r['text'], version=2)
-                repeat = f" (_{escape_markdown(r['repeat'], version=2)}_)" if r['repeat'] else ""
+                repeat = f" \\(_{escape_markdown(r['repeat'], version=2)}_\\)" if r['repeat'] else ""
                 lines.append(f"  #{rid}  {rt}{repeat}  {rtext}")
-            lines.append("\n\nGunakan `/reminders` untuk kelola")
             msg = "\n".join(lines)
         else:
-            msg = "⏰ *Reminder*\n\nBelum ada reminder aktif\\.\n\nGunakan:\n`/remind \\<HH:MM\\> \\<pesan\\>` untuk reminder harian\n`/remindat \\<YYYY\-MM\-DD HH:MM\\> \\<pesan\\>` untuk sekali"
-        await query.edit_message_text(msg, parse_mode="MarkdownV2", reply_markup=_menu_keyboard())
+            msg = "⏰ *Reminder*\n\nBelum ada reminder aktif\\.\nPilih opsi di bawah untuk menambahkan\\."
+        await query.edit_message_text(msg, parse_mode="MarkdownV2", reply_markup=InlineKeyboardMarkup(keyboard))
+    elif data == "add_remind_daily":
+        await query.edit_message_text(
+            "⏰ *Reminder Harian*\n\nKetik jam dan pesan:\n`/remind HH:MM pesan`\n\nContoh:\n`/remind 09:00 Minum kopi`",
+            parse_mode="MarkdownV2",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Kembali", callback_data="menu_reminder")]]),
+        )
+    elif data == "add_remind_once":
+        await query.edit_message_text(
+            "⏰ *Reminder Sekali*\n\nKetik tanggal, jam, dan pesan:\n`/remindat YYYY\-MM\-DD HH:MM pesan`\n\nContoh:\n`/remindat 2026\-06\-20 14:00 Meeting`",
+            parse_mode="MarkdownV2",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Kembali", callback_data="menu_reminder")]]),
+        )
+    elif data == "list_reminders":
+        reminders = sched.get_reminders(update.effective_user.id)
+        if reminders:
+            lines = ["📋 *Semua Reminder*\n"]
+            for r in reminders:
+                rid = r['id']
+                rt = escape_markdown(r['remind_at'][:16], version=2)
+                rtext = escape_markdown(r['text'], version=2)
+                repeat = f" \\(_{escape_markdown(r['repeat'], version=2)}_\\)" if r['repeat'] else ""
+                lines.append(f"  #{rid}  {rt}{repeat}  {rtext}")
+            msg = "\n".join(lines)
+        else:
+            msg = "Tidak ada reminder aktif\\."
+        await query.edit_message_text(msg, parse_mode="MarkdownV2", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Kembali", callback_data="menu_reminder")]]))
+    elif data.startswith("del_remind_"):
+        rid = int(data.split("_")[-1])
+        if sched.remove_reminder(rid):
+            await query.answer(f"Reminder #{rid} dihapus")
+            reminders = sched.get_reminders(update.effective_user.id)
+            keyboard = [
+                [InlineKeyboardButton("➕ Reminder Harian", callback_data="add_remind_daily")],
+                [InlineKeyboardButton("➕ Reminder Sekali", callback_data="add_remind_once")],
+            ]
+            if reminders:
+                keyboard.append([InlineKeyboardButton("📋 Lihat Semua Reminder", callback_data="list_reminders")])
+                for r in reminders:
+                    rid2 = r['id']
+                    rtext = r['text'][:20]
+                    keyboard.append([InlineKeyboardButton(f"🗑️ #{rid2} {rtext}", callback_data=f"del_remind_{rid2}")])
+            keyboard.append([InlineKeyboardButton("❌ Kembali", callback_data="menu_start")])
+            if reminders:
+                lines = ["⏰ *Reminder Aktif*\n"]
+                for r in reminders:
+                    rid2 = r['id']
+                    rt = escape_markdown(r['remind_at'][:16], version=2)
+                    rtext = escape_markdown(r['text'], version=2)
+                    repeat = f" \\(_{escape_markdown(r['repeat'], version=2)}_\\)" if r['repeat'] else ""
+                    lines.append(f"  #{rid2}  {rt}{repeat}  {rtext}")
+                msg = "\n".join(lines)
+            else:
+                msg = "⏰ *Reminder*\n\nSemua reminder sudah dihapus\\."
+            await query.edit_message_text(msg, parse_mode="MarkdownV2", reply_markup=InlineKeyboardMarkup(keyboard))
+        else:
+            await query.answer(f"Reminder #{rid} tidak ditemukan", show_alert=True)
     elif data == "menu_rank":
         s = storage.get_stats()
         total = s["total"]
@@ -361,19 +429,24 @@ async def menu_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         subprocess.Popen([sys.executable] + sys.argv, cwd=os.path.dirname(os.path.abspath(__file__)) + "/..")
         os._exit(0)
     elif data == "export_today":
+        print(f"[DEBUG] export_today callback received")
         today = date.today().isoformat()
         await _generate_and_send_pdf(query, start_date=today, end_date=today)
     elif data == "export_week":
+        print(f"[DEBUG] export_week callback received")
         week_ago = (date.today() - timedelta(days=7)).isoformat()
         today = date.today().isoformat()
         await _generate_and_send_pdf(query, start_date=week_ago, end_date=today)
     elif data == "export_month":
+        print(f"[DEBUG] export_month callback received")
         first_day = date.today().replace(day=1).isoformat()
         today = date.today().isoformat()
         await _generate_and_send_pdf(query, start_date=first_day, end_date=today)
     elif data == "export_all":
+        print(f"[DEBUG] export_all callback received")
         await _generate_and_send_pdf(query)
     elif data == "export_custom":
+        print(f"[DEBUG] export_custom callback received")
         await query.edit_message_text(
             "✏️ *Custom Date Range*\n\nKetik:\n`/export YYYY\-MM\-DD YYYY\-MM\-DD`\n\nContoh:\n`/export 2026\-06\-01 2026\-06\-15`",
             parse_mode="MarkdownV2",
@@ -750,7 +823,9 @@ async def _generate_and_send_pdf(query, start_date=None, end_date=None):
     try:
         today = date.today().isoformat()
         output_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), f"journal_{today}.pdf")
+        print(f"[EXPORT] Generating PDF: {start_date} to {end_date}")
         generate_pdf(start_date=start_date, end_date=end_date, output_path=output_path)
+        print(f"[EXPORT] PDF generated: {output_path}")
 
         caption = "Journal Report\n\n"
         if start_date and end_date:
@@ -771,9 +846,13 @@ async def _generate_and_send_pdf(query, start_date=None, end_date=None):
             )
 
         os.remove(output_path)
-        await query.delete_message()
+        try:
+            await query.delete_message()
+        except Exception:
+            pass
 
     except Exception as e:
+        print(f"[EXPORT] Error: {e}")
         try:
             await query.edit_message_text(f"❌ Gagal generate PDF: {str(e)}")
         except Exception:
