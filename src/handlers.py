@@ -221,7 +221,7 @@ async def menu_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(msg, parse_mode="MarkdownV2", reply_markup=_menu_keyboard())
     elif data == "menu_date":
         await query.edit_message_text(
-            "📅 *Cari Tanggal*\n\nGunakan:\n`/date YYYY-MM-DD`",
+            "📅 *Cari Tanggal*\n\nGunakan:\n`/date YYYY\-MM\-DD`",
             parse_mode="MarkdownV2",
             reply_markup=_menu_keyboard(),
         )
@@ -244,7 +244,7 @@ async def menu_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             lines.append("\n\nGunakan `/reminders` untuk kelola")
             msg = "\n".join(lines)
         else:
-            msg = "⏰ *Reminder*\n\nBelum ada reminder aktif\\.\n\nGunakan:\n`/remind \\<HH:MM\\> \\<pesan\\>` untuk reminder harian\n`/remindat \\<YYYY-MM-DD HH:MM\\> \\<pesan\\>` untuk sekali"
+            msg = "⏰ *Reminder*\n\nBelum ada reminder aktif\\.\n\nGunakan:\n`/remind \\<HH:MM\\> \\<pesan\\>` untuk reminder harian\n`/remindat \\<YYYY\-MM\-DD HH:MM\\> \\<pesan\\>` untuk sekali"
         await query.edit_message_text(msg, parse_mode="MarkdownV2", reply_markup=_menu_keyboard())
     elif data == "menu_rank":
         s = storage.get_stats()
@@ -370,18 +370,18 @@ async def menu_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             "`/log \\<teks\\>` — Catat kegiatan manual\n"
             "`/today` — Lihat catatan hari ini\n"
             "`/yesterday` — Lihat catatan kemarin\n"
-            "`/date YYYY-MM-DD` — Catatan tanggal tertentu\n"
+            "`/date YYYY\-MM\-DD` — Catatan tanggal tertentu\n"
             "`/search \\<kata\\>` — Cari catatan lama\n"
             "`/all` — Tampilkan arsip tanggal\n"
             "`/stats` — Statistik Hunter\n"
             "`/rank` — Cek Rank Hunter\n"
             "`/export` — Export jurnal ke PDF\n"
-            "`/export YYYY-MM-DD YYYY-MM-DD` — Export periode tertentu\n"
+            "`/export YYYY\-MM\-DD YYYY\-MM\-DD` — Export periode tertentu\n"
             "`/del \\<id\\>` — Hapus catatan\n"
             "`/clear` — Hapus semua log catatan\n"
             "`/restart` — Memulai ulang bot (refresh)\n"
             "`/remind \\<HH:MM\\> \\<pesan\\>` — Reminder harian\n"
-            "`/remindat \\<YYYY-MM-DD HH:MM\\> \\<pesan\\>` — Reminder sekali\n"
+            "`/remindat \\<YYYY\-MM\-DD HH:MM\\> \\<pesan\\>` — Reminder sekali\n"
             "`/reminders` — Daftar reminder aktif\n"
             "`/unremind \\<id\\>` — Hapus reminder\n\n"
             "Atau kirim pesan langsung untuk mencatat log harian secara instan\\."
@@ -426,7 +426,7 @@ async def cmd_today(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     safe_delete_message(update.message)
     entries = storage.get_today()
     today_str = date.today().isoformat()
-    msg = _fmt_entries(entries, f"Hari Ini ({today_str})")
+    msg = _fmt_entries(entries, f"Hari Ini \\({today_str}\\)")
     if len(msg) > 4000:
         msg = msg[:4000] + "\n\n... \(terlalu panjang\)"
     await update.message.reply_text(msg, parse_mode="MarkdownV2", reply_markup=_menu_keyboard())
@@ -448,7 +448,7 @@ async def cmd_date(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     safe_delete_message(update.message)
     d = " ".join(ctx.args)
     if not d:
-        await update.message.reply_text("Gunakan: /date YYYY-MM-DD")
+        await update.message.reply_text("Gunakan: /date YYYY\-MM\-DD")
         return
     entries = storage.get_by_date(d)
     msg = _fmt_entries(entries, f"Catatan \\({d}\\)")
@@ -609,8 +609,8 @@ async def cmd_remindat(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     args = " ".join(ctx.args)
     if not args:
         await update.message.reply_text(
-            "Gunakan: /remindat \\<YYYY-MM-DD HH:MM\\> \\<pesan\\>\n"
-            "Contoh: `/remindat 2026-06-16 14:30 Meeting`",
+            "Gunakan: /remindat \\<YYYY\-MM\-DD HH:MM\\> \\<pesan\\>\n"
+            "Contoh: `/remindat 2026\\-06\\-16 14:30 Meeting`",
             parse_mode="MarkdownV2",
         )
         return
