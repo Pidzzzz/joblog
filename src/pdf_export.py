@@ -3,7 +3,13 @@ from datetime import date, timedelta
 from fpdf import FPDF
 
 from src import storage
-from src.ranks import get_rank, get_xp_progress, get_streak_info, format_progress_bar
+from src.ranks import get_rank, get_xp_progress, get_streak_info
+
+
+def format_progress_bar_ascii(percent: int, length: int = 10) -> str:
+    filled = int(length * percent / 100)
+    bar = "#" * filled + "-" * (length - filled)
+    return f"[{bar}] {percent}%"
 
 
 class JournalPDF(FPDF):
@@ -54,8 +60,8 @@ def generate_pdf(entries=None, start_date=None, end_date=None, output_path=None)
     pdf.cell(0, 6, f"Current Streak: {streak['streak']} days", new_x="LMARGIN", new_y="NEXT")
 
     if xp["next"]:
-        bar = format_progress_bar(xp["percent"])
-        pdf.cell(0, 6, f"Progress to {xp['next']['rank']}: {bar} {xp['percent']}%", new_x="LMARGIN", new_y="NEXT")
+        bar = format_progress_bar_ascii(xp["percent"])
+        pdf.cell(0, 6, f"Progress to {xp['next']['rank']}: {bar}", new_x="LMARGIN", new_y="NEXT")
 
     if streak["milestone"]:
         m = streak["milestone"]
