@@ -1175,13 +1175,17 @@ async def auto_log(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     try:
         msg = await ctx.bot.send_message(chat_id=chat_id, text=msg_text, parse_mode="MarkdownV2")
         bot_message_history[chat_id].append(msg.message_id)
-        await asyncio.sleep(3)
-        try:
-            await msg.delete()
-            if msg.message_id in bot_message_history[chat_id]:
-                bot_message_history[chat_id].remove(msg.message_id)
-        except Exception:
-            pass
+        asyncio.create_task(_auto_delete_message(ctx.bot, chat_id, msg.message_id, 3))
+    except Exception:
+        pass
+
+
+async def _auto_delete_message(bot, chat_id, message_id, delay):
+    await asyncio.sleep(delay)
+    try:
+        await bot.delete_message(chat_id=chat_id, message_id=message_id)
+        if chat_id in bot_message_history and message_id in bot_message_history[chat_id]:
+            bot_message_history[chat_id].remove(message_id)
     except Exception:
         pass
 
