@@ -4,7 +4,7 @@ from src.commands import (
     start, cmd_log, cmd_agenda, cmd_today, cmd_yesterday, cmd_date,
     cmd_search, cmd_all, cmd_stats, cmd_del, cmd_clear, cmd_restart,
     cmd_remind, cmd_remindat, cmd_reminders, cmd_unremind, cmd_rank,
-    cmd_export, auto_log
+    cmd_export, cmd_ai, auto_log
 )
 from src.callbacks import menu_callback
 from src.helpers import _show_delete_list
@@ -23,6 +23,7 @@ def get_handlers():
         CommandHandler("stats", cmd_stats),
         CommandHandler("rank", cmd_rank),
         CommandHandler("export", cmd_export),
+        CommandHandler("ai", cmd_ai),
         CommandHandler("del", cmd_del),
         CommandHandler("clear", cmd_clear),
         CommandHandler("restart", cmd_restart),

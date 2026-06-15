@@ -15,7 +15,7 @@ from src.helpers import (
     OWNER_ID, _is_owner, safe_delete_message, _fmt_entry, _fmt_entries,
     _menu_keyboard, _section_keyboard, _send_and_auto_delete,
     _delete_all_bot_messages, last_bot_messages, bot_message_history,
-    user_reminder_state
+    user_reminder_state, bot_stats
 )
 
 
@@ -389,6 +389,43 @@ async def cmd_rank(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(msg, parse_mode="MarkdownV2", reply_markup=_menu_keyboard())
 
 
+async def cmd_ai(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not _is_owner(update):
+        return
+    safe_delete_message(update.message)
+    
+    if bot_stats["start_time"] is None:
+        bot_stats["start_time"] = datetime.now()
+    
+    uptime = datetime.now() - bot_stats["start_time"]
+    hours = int(uptime.total_seconds() // 3600)
+    minutes = int((uptime.total_seconds() % 3600) // 60)
+    seconds = int(uptime.total_seconds() % 60)
+    
+    total_api_calls = bot_stats["messages_received"] + bot_stats["messages_sent"]
+    
+    text = (
+        "╔════════════════════════╗\n"
+        "🤖   *AI SYSTEM INFO*   🤖\n"
+        "╚════════════════════════╝\n\n"
+        f"*Model:* `mimo\\-auto`\n"
+        f"*Provider:* `Xiaomi MiMo Team`\n"
+        f"*Framework:* `python\\-telegram\\-bot 22\\.8`\n\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"📊 *Statistik Penggunaan:*\n\n"
+        f"  📨 Pesan diterima: `{bot_stats['messages_received']}`\n"
+        f"  📤 Pesan dikirim: `{bot_stats['messages_sent']}`\n"
+        f"  ⚡ Commands dipanggil: `{bot_stats['commands_used']}`\n"
+        f"  🔘 Callbacks ditangani: `{bot_stats['callbacks_handled']}`\n"
+        f"  🔄 Total API calls: `{total_api_calls}`\n\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"⏱️ *Uptime:* `{hours}j {minutes}m {seconds}s`\n\n"
+        "_Bot ini dibangun oleh MiMoCode AI Assistant_"
+    )
+    
+    await update.message.reply_text(text, parse_mode="MarkdownV2", reply_markup=_menu_keyboard())
+
+
 async def cmd_export(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not _is_owner(update):
         return
@@ -453,6 +490,7 @@ async def auto_log(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     uid = update.effective_user.id
     chat_id = update.effective_chat.id
     track_user(chat_id)
+    bot_stats["messages_received"] += 1
 
     if uid in user_reminder_state:
         state = user_reminder_state.pop(uid)

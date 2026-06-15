@@ -11,6 +11,14 @@ last_bot_messages = {}
 bot_message_history = {}
 user_reminder_state = {}
 
+bot_stats = {
+    "messages_received": 0,
+    "messages_sent": 0,
+    "commands_used": 0,
+    "callbacks_handled": 0,
+    "start_time": None,
+}
+
 
 def _is_owner(update: Update) -> bool:
     return update.effective_user.id == OWNER_ID
@@ -60,8 +68,11 @@ def _menu_keyboard():
             InlineKeyboardButton("🗑️ Hapus Log", callback_data="menu_clear"),
         ],
         [
-            InlineKeyboardButton("🔄 Restart Bot", callback_data="menu_restart"),
+            InlineKeyboardButton("🤖 AI Info", callback_data="menu_ai"),
             InlineKeyboardButton("❓ Panduan", callback_data="menu_help"),
+        ],
+        [
+            InlineKeyboardButton("🔄 Restart Bot", callback_data="menu_restart"),
         ]
     ]
     return InlineKeyboardMarkup(keyboard)

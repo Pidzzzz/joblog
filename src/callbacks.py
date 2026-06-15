@@ -12,7 +12,7 @@ from src.pdf_export import generate_pdf
 from src.helpers import (
     _is_owner, _fmt_entries, _menu_keyboard, _section_keyboard,
     _show_delete_list, last_bot_messages, bot_message_history,
-    delete_selections, user_reminder_state
+    delete_selections, user_reminder_state, bot_stats
 )
 
 
@@ -74,6 +74,7 @@ async def menu_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     data = query.data
+    bot_stats["callbacks_handled"] += 1
 
     if data == "menu_start":
         s = storage.get_stats()
@@ -418,6 +419,38 @@ async def menu_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         import subprocess, sys
         subprocess.Popen([sys.executable] + sys.argv, cwd=os.path.dirname(os.path.abspath(__file__)) + "/..")
         os._exit(0)
+
+    elif data == "menu_ai":
+        if bot_stats["start_time"] is None:
+            bot_stats["start_time"] = datetime.now()
+        
+        uptime = datetime.now() - bot_stats["start_time"]
+        hours = int(uptime.total_seconds() // 3600)
+        minutes = int((uptime.total_seconds() % 3600) // 60)
+        seconds = int(uptime.total_seconds() % 60)
+        
+        total_api_calls = bot_stats["messages_received"] + bot_stats["messages_sent"]
+        
+        text = (
+            "╔════════════════════════╗\n"
+            "🤖   *AI SYSTEM INFO*   🤖\n"
+            "╚════════════════════════╝\n\n"
+            f"*Model:* `mimo\\-auto`\n"
+            f"*Provider:* `Xiaomi MiMo Team`\n"
+            f"*Framework:* `python\\-telegram\\-bot 22\\.8`\n\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"📊 *Statistik Penggunaan:*\n\n"
+            f"  📨 Pesan diterima: `{bot_stats['messages_received']}`\n"
+            f"  📤 Pesan dikirim: `{bot_stats['messages_sent']}`\n"
+            f"  ⚡ Commands dipanggil: `{bot_stats['commands_used']}`\n"
+            f"  🔘 Callbacks ditangani: `{bot_stats['callbacks_handled']}`\n"
+            f"  🔄 Total API calls: `{total_api_calls}`\n\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"⏱️ *Uptime:* `{hours}j {minutes}m {seconds}s`\n\n"
+            "_Bot ini dibangun oleh MiMoCode AI Assistant_"
+        )
+        
+        await query.edit_message_text(text, parse_mode="MarkdownV2", reply_markup=_menu_keyboard())
 
     elif data == "menu_help":
         text = (
