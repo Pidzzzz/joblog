@@ -114,6 +114,41 @@ def _menu_keyboard():
     return InlineKeyboardMarkup(keyboard)
 
 
+def _section_keyboard(section):
+    if section == "log":
+        return InlineKeyboardMarkup([
+            [InlineKeyboardButton("📝 Log Baru", callback_data="menu_log"),
+             InlineKeyboardButton("📅 Agenda", callback_data="menu_agenda")],
+            [InlineKeyboardButton("🔍 Cari Log", callback_data="menu_search")],
+            [InlineKeyboardButton("❌ Kembali", callback_data="menu_start")],
+        ])
+    elif section == "rank":
+        return InlineKeyboardMarkup([
+            [InlineKeyboardButton("⚔️ Rank Saya", callback_data="menu_rank"),
+             InlineKeyboardButton("📈 Statistik", callback_data="menu_stats")],
+            [InlineKeyboardButton("❌ Kembali", callback_data="menu_start")],
+        ])
+    elif section == "search":
+        return InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔍 Cari Log", callback_data="menu_search"),
+             InlineKeyboardButton("🗂️ Arsip", callback_data="menu_all")],
+            [InlineKeyboardButton("❌ Kembali", callback_data="menu_start")],
+        ])
+    elif section == "reminder":
+        return InlineKeyboardMarkup([
+            [InlineKeyboardButton("➕ Reminder Harian", callback_data="add_remind_daily")],
+            [InlineKeyboardButton("➕ Reminder Sekali", callback_data="add_remind_once")],
+            [InlineKeyboardButton("❌ Kembali", callback_data="menu_start")],
+        ])
+    elif section == "danger":
+        return InlineKeyboardMarkup([
+            [InlineKeyboardButton("🗑️ Hapus Log", callback_data="menu_clear")],
+            [InlineKeyboardButton("🔄 Restart Bot", callback_data="menu_restart")],
+            [InlineKeyboardButton("❌ Kembali", callback_data="menu_start")],
+        ])
+    return _menu_keyboard()
+
+
 async def _show_delete_list(query, entries, selected, user_id):
     lines = [f"🗑️ *Hapus Log* \\({len(entries)} catatan hari ini\\)\n"]
     lines.append("_Pilih log yang ingin dihapus, lalu tekan *Hapus Terpilih*_\n")
@@ -247,29 +282,29 @@ async def menu_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(
             "📝 *Log Aktivitas*\n\nKetik langsung pesan atau gunakan:\n`/log \\<aktivitas\\>` untuk mencatat kegiatan baru\\.",
             parse_mode="MarkdownV2",
-            reply_markup=_menu_keyboard(),
+            reply_markup=_section_keyboard("log"),
         )
     elif data == "menu_agenda":
         msg = get_agenda_text(update.effective_user.id)
-        await query.edit_message_text(msg, parse_mode="MarkdownV2", reply_markup=_menu_keyboard())
+        await query.edit_message_text(msg, parse_mode="MarkdownV2", reply_markup=_section_keyboard("log"))
     elif data == "menu_today":
         entries = storage.get_today()
         today_str = date.today().isoformat()
         msg = _fmt_entries(entries, f"Hari Ini \\({today_str}\\)")
         if len(msg) > 4000:
             msg = msg[:4000] + "\n\n... \(terlalu panjang\)"
-        await query.edit_message_text(msg, parse_mode="MarkdownV2", reply_markup=_menu_keyboard())
+        await query.edit_message_text(msg, parse_mode="MarkdownV2", reply_markup=_section_keyboard("log"))
     elif data == "menu_date":
         await query.edit_message_text(
             "📅 *Cari Tanggal*\n\nGunakan:\n`/date YYYY\-MM\-DD`",
             parse_mode="MarkdownV2",
-            reply_markup=_menu_keyboard(),
+            reply_markup=_section_keyboard("log"),
         )
     elif data == "menu_search":
         await query.edit_message_text(
             "🔍 *Cari Log*\n\nGunakan:\n`/search \\<kata kunci\\>` untuk mencari catatan lama\\.",
             parse_mode="MarkdownV2",
-            reply_markup=_menu_keyboard(),
+            reply_markup=_section_keyboard("search"),
         )
     elif data == "menu_reminder":
         reminders = sched.get_reminders(update.effective_user.id)
@@ -479,7 +514,7 @@ async def menu_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         lines.append("\n━━━━━━━━━━━━━━━━━━━━━━━━━━")
         lines.append("_Terus catat aktivitas\\! Arise\\!_")
         msg = "\n".join(lines)
-        await query.edit_message_text(msg, parse_mode="MarkdownV2", reply_markup=_menu_keyboard())
+        await query.edit_message_text(msg, parse_mode="MarkdownV2", reply_markup=_section_keyboard("rank"))
     elif data == "menu_stats":
         s = storage.get_stats()
         if s["total"] == 0:
@@ -492,7 +527,7 @@ async def menu_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                 f"Pertama: {escape_markdown(s['first_date'], version=2)}\n"
                 f"Terakhir: {escape_markdown(s['last_date'], version=2)}"
             )
-        await query.edit_message_text(msg, parse_mode="MarkdownV2", reply_markup=_menu_keyboard())
+        await query.edit_message_text(msg, parse_mode="MarkdownV2", reply_markup=_section_keyboard("rank"))
     elif data == "menu_all":
         dates = storage.get_all_dates()
         if not dates:
@@ -503,7 +538,7 @@ async def menu_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             for d, count in dates:
                 lines.append(f"  {escape_markdown(d, version=2)}  \\({count}\\)")
             msg = "\n".join(lines)
-        await query.edit_message_text(msg, parse_mode="MarkdownV2", reply_markup=_menu_keyboard())
+        await query.edit_message_text(msg, parse_mode="MarkdownV2", reply_markup=_section_keyboard("search"))
     elif data == "menu_clear":
         entries = storage.get_today()
         if not entries:
