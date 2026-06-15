@@ -10,6 +10,7 @@ from src import storage
 from src import scheduler as sched
 from src.ranks import get_rank, get_xp_progress, get_streak_info, format_progress_bar
 from src.pdf_export import generate_pdf
+from src.user_tracker import track_user
 
 OWNER_ID = int(os.getenv("DEVELOPER_ID", "0"))
 
@@ -167,6 +168,7 @@ async def start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not _is_owner(update):
         await update.message.reply_text("⛔ Bot ini pribadi.")
         return
+    track_user(update.effective_chat.id)
     s = storage.get_stats()
     xp = get_xp_progress(s["total"])
     rank = xp["rank"]
@@ -768,6 +770,7 @@ async def auto_log(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         return
 
     chat_id = update.effective_chat.id
+    track_user(chat_id)
     safe_delete_message(update.message)
 
     old_msg = last_bot_messages.get(chat_id)

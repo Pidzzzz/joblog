@@ -8,3 +8,4 @@ stdout.log
 stderr.log
 downloads/
 reminders.json
+active_users.json
