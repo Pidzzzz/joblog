@@ -1210,6 +1210,6 @@ def get_handlers():
         CommandHandler("remindat", cmd_remindat),
         CommandHandler("reminders", cmd_reminders),
         CommandHandler("unremind", cmd_unremind),
-        CallbackQueryHandler(menu_callback, pattern="^(menu_|export_|add_remind_|set_daily_|set_once_|del_remind_|list_reminders)"),
+        CallbackQueryHandler(menu_callback, pattern="^(menu_|export_|add_remind_|set_daily_|set_once_|del_remind_|list_reminders|toggle_del_|delete_selected|delete_all_today)"),
         MessageHandler(filters.TEXT & ~filters.COMMAND, auto_log),
     ]
