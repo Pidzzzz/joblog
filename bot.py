@@ -8,7 +8,8 @@ from telegram import BotCommand
 from telegram.ext import ApplicationBuilder
 from telegram.helpers import escape_markdown
 
-from src.handlers import get_handlers, _menu_keyboard
+from src.handlers import get_handlers
+from src.helpers import _menu_keyboard
 from src.scheduler import scheduler, restore_reminders
 from src import storage
 from src.ranks import get_xp_progress
