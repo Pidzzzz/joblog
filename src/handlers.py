@@ -635,7 +635,17 @@ async def cmd_log(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
     entry = storage.add_entry(text)
     msg_text = f"✅ *Tersimpan*\n{_fmt_entry(entry)}"
-    await _send_and_auto_delete(update.message, msg_text)
+    try:
+        msg = await ctx.bot.send_message(chat_id=chat_id, text=msg_text, parse_mode="MarkdownV2")
+        bot_message_history[chat_id].append(msg.message_id)
+        await asyncio.sleep(3)
+        try:
+            await msg.delete()
+            bot_message_history[chat_id].remove(msg.message_id)
+        except Exception:
+            pass
+    except Exception:
+        pass
 
 
 async def cmd_agenda(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -1123,7 +1133,17 @@ async def auto_log(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
     entry = storage.add_entry(text)
     msg_text = f"✅ *Tersimpan*\n{_fmt_entry(entry)}"
-    await _send_and_auto_delete(update.message, msg_text)
+    try:
+        msg = await ctx.bot.send_message(chat_id=chat_id, text=msg_text, parse_mode="MarkdownV2")
+        bot_message_history[chat_id].append(msg.message_id)
+        await asyncio.sleep(3)
+        try:
+            await msg.delete()
+            bot_message_history[chat_id].remove(msg.message_id)
+        except Exception:
+            pass
+    except Exception:
+        pass
 
 
 def get_handlers():
