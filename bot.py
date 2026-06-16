@@ -174,4 +174,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-# Proxy base URL and Gemini key configured successfully - visual cards enabled
+# Proxy base URL and Gemini key configured successfully - visual cards V2 upgraded
