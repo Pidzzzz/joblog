@@ -12,7 +12,11 @@ from src.pdf_export import generate_pdf
 from src.helpers import (
     _is_owner, _fmt_entries, _menu_keyboard, _section_keyboard,
     _show_delete_list, last_bot_messages, bot_message_history,
-    delete_selections, user_reminder_state, bot_stats
+    delete_selections, user_reminder_state, bot_stats, _send_menu
+)
+from src.image_generator import (
+    generate_welcome_card, generate_status_card, generate_stats_card,
+    generate_agenda_card
 )
 
 
@@ -80,16 +84,23 @@ async def menu_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         s = storage.get_stats()
         xp = get_xp_progress(s["total"])
         rank = xp["rank"]
-        text = (
-            "╔════════════════════════╗\n"
-            "   ⚔️  *SOLO LEVELING JOURNAL*  ⚔️   \n"
-            "╚════════════════════════╝\n\n"
-            f"{rank['emoji']} *Rank:* `{escape_markdown(rank['rank'], version=2)}` \\— {escape_markdown(rank['title'], version=2)}\n\n"
-            "Selamat datang, *Hunter*\\. Ini adalah log harian pribadi Anda\\.\n"
-            "Setiap tugas, aktivitas, dan langkah perjalanan Anda akan direkam di sini\\.\n\n"
-            "*Arise\\!* Mulai pencatatan Anda sekarang\\."
+        
+        photo_bytes = generate_welcome_card(
+            hunter_name=update.effective_user.first_name,
+            rank_letter=rank["rank"],
+            rank_title=rank["title"],
+            total_entries=s["total"],
+            active_days=s["days"]
         )
-        await query.edit_message_text(text, parse_mode="MarkdownV2", reply_markup=_menu_keyboard())
+        
+        caption = "*SoloLeveling Journal* \\— Main System"
+        await _send_menu(
+            chat_id=update.effective_chat.id,
+            bot=ctx.bot,
+            text=caption,
+            photo=photo_bytes,
+            reply_markup=_menu_keyboard()
+        )
 
     elif data == "menu_log":
         await query.edit_message_text(
@@ -98,8 +109,34 @@ async def menu_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             reply_markup=_section_keyboard("log"),
         )
     elif data == "menu_agenda":
-        msg = get_agenda_text(update.effective_user.id)
-        await query.edit_message_text(msg, parse_mode="MarkdownV2", reply_markup=_section_keyboard("log"))
+        chat_id = update.effective_chat.id
+        logs = storage.get_today()
+        all_reminders = sched.get_reminders(chat_id)
+        today_str = date.today().isoformat()
+        
+        today_reminders = []
+        for r in all_reminders:
+            if r.get("repeat") == "daily":
+                today_reminders.append(r)
+            else:
+                r_date = r.get("remind_at", "").split("T")[0]
+                if r_date == today_str:
+                    today_reminders.append(r)
+                    
+        photo_bytes = generate_agenda_card(
+            date_str=today_str,
+            active_quests=today_reminders,
+            cleared_quests=logs
+        )
+        
+        caption = "*SoloLeveling Journal* \\— Daily Quest Board"
+        await _send_menu(
+            chat_id=chat_id,
+            bot=ctx.bot,
+            text=caption,
+            photo=photo_bytes,
+            reply_markup=_section_keyboard("log")
+        )
     elif data == "menu_today":
         entries = storage.get_today()
         today_str = date.today().isoformat()
@@ -299,51 +336,55 @@ async def menu_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             await query.answer(f"Reminder #{rid} tidak ditemukan", show_alert=True)
 
     elif data == "menu_rank":
+        chat_id = update.effective_chat.id
         s = storage.get_stats()
         total = s["total"]
         all_entries = storage.get_all_entries()
         xp = get_xp_progress(total)
         streak = get_streak_info(all_entries)
-        bar = format_progress_bar(xp["percent"])
         rank = xp["rank"]
-        next_rank = xp["next"]
-        lines = [
-            "╔════════════════════════╗",
-            "⚔️   *HUNTER RANK STATUS*   ⚔️",
-            "╚════════════════════════╝\n",
-            f"{rank['emoji']} *Rank:* `{escape_markdown(rank['rank'], version=2)}` \\— {escape_markdown(rank['title'], version=2)}",
-            f"📊 *Total Catatan:* `{total}`",
-            f"📅 *Hari Aktif:* `{s['days']}`\n",
-        ]
-        if next_rank:
-            lines.append(f"*Progress ke {escape_markdown(next_rank['rank'], version=2)}:*\n")
-            lines.append(f"`{bar}` {xp['percent']}%")
-            lines.append(f"_{xp['entries_needed']} catatan lagi ke {escape_markdown(next_rank['rank'], version=2)}_")
-        else:
-            lines.append("_*MAX RANK TERCAPAI\\!* 🏆_")
-        if streak["streak"] > 0:
-            lines.append(f"\n🔥 *Streak:* `{streak['streak']}` hari")
-            if streak["milestone"]:
-                m = streak["milestone"]
-                lines.append(f"{m['emoji']} *Title:* {escape_markdown(m['title'], version=2)}")
-        lines.append("\n━━━━━━━━━━━━━━━━━━━━━━━━━━")
-        lines.append("_Terus catat aktivitas\\! Arise\\!_")
-        msg = "\n".join(lines)
-        await query.edit_message_text(msg, parse_mode="MarkdownV2", reply_markup=_section_keyboard("rank"))
+        
+        streak_title = streak["milestone"]["title"] if streak["milestone"] else "Novice Hunter"
+        
+        photo_bytes = generate_status_card(
+            hunter_name=update.effective_user.first_name,
+            rank_letter=rank["rank"],
+            rank_title=rank["title"],
+            xp_percent=xp["percent"],
+            streak_days=streak["streak"],
+            streak_title=streak_title,
+            total_entries=total,
+            active_days=s["days"]
+        )
+        
+        caption = "*SoloLeveling Journal* \\— Hunter Status"
+        await _send_menu(
+            chat_id=chat_id,
+            bot=ctx.bot,
+            text=caption,
+            photo=photo_bytes,
+            reply_markup=_section_keyboard("rank")
+        )
 
     elif data == "menu_stats":
+        chat_id = update.effective_chat.id
         s = storage.get_stats()
-        if s["total"] == 0:
-            msg = "Belum ada catatan\\."
-        else:
-            msg = (
-                f"📈 *Statistik Hunter*\n\n"
-                f"Total catatan: {s['total']}\n"
-                f"Total hari aktif: {s['days']}\n"
-                f"Pertama: {escape_markdown(s['first_date'], version=2)}\n"
-                f"Terakhir: {escape_markdown(s['last_date'], version=2)}"
-            )
-        await query.edit_message_text(msg, parse_mode="MarkdownV2", reply_markup=_section_keyboard("rank"))
+        
+        photo_bytes = generate_stats_card(
+            total_entries=s["total"],
+            active_days=s["days"],
+            first_date=s["first_date"],
+            last_date=s["last_date"]
+        )
+        
+        caption = "*SoloLeveling Journal* \\— Hunter Statistics"
+        await _send_menu(
+            chat_id=chat_id,
+            bot=ctx.bot,
+            text=caption,
+            photo=photo_bytes,
+            reply_markup=_section_keyboard("rank")
+        )
 
     elif data == "menu_all":
         dates = storage.get_all_dates()

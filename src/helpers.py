@@ -246,6 +246,27 @@ async def _delete_all_bot_messages(chat_id, ctx=None, bot=None):
     print(f"[CLEANUP] Deleted {deleted} messages for chat {chat_id}")
 
 
+async def _send_menu(chat_id, bot, text=None, photo=None, reply_markup=None, parse_mode="MarkdownV2"):
+    await _delete_all_bot_messages(chat_id, bot=bot)
+    if photo:
+        msg = await bot.send_photo(
+            chat_id=chat_id,
+            photo=photo,
+            caption=text or "",
+            parse_mode=parse_mode,
+            reply_markup=reply_markup
+        )
+    else:
+        msg = await bot.send_message(
+            chat_id=chat_id,
+            text=text,
+            parse_mode=parse_mode,
+            reply_markup=reply_markup
+        )
+    last_bot_messages[chat_id] = msg.message_id
+    return msg
+
+
 async def _show_delete_list(query, entries, selected, user_id):
     lines = [f"🗑️ *Hapus Log* \\({len(entries)} catatan hari ini\\)\n"]
     lines.append("_Pilih log yang ingin dihapus, lalu tekan *Hapus Terpilih*_\n")
