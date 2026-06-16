@@ -1,17 +1,17 @@
-# SoloLeveling Journal Bot
+# ⚔️ SoloLeveling Journal Bot
 
 A Telegram bot for personal daily journaling with Solo Leveling theme. Log your activities, track your rank, scan food nutrients using AI, and level up your productivity — all from Telegram.
 
-## Features
+## ✨ Features
 
-### Core
+### 📝 Core
 - **Instant Logging** — Send any message, it's saved automatically
 - **Manual Commands** — `/log <activity>` for explicit entries
 - **Daily Review** — `/today`, `/yesterday`, `/date YYYY-MM-DD`
 - **Search** — `/search <keyword>` to find past entries
 - **Archive** — `/all` shows all dates with entries
 
-### Gamification
+### 🏆 Gamification
 - **Hunter Rank System** — E → D → C → B → A → S → National Level
 - **XP Progress Bar** — Visual progress to next rank
 - **Streak Tracking** — Consecutive logging days with milestone titles
@@ -21,7 +21,7 @@ A Telegram bot for personal daily journaling with Solo Leveling theme. Log your 
   - 60 days: Marshal
   - 90 days: Shadow Monarch
 
-### Reminders
+### ⏰ Reminders
 - **Daily Reminders** — `/remind HH:MM <text>`
 - **One-time Reminders** — `/remindat YYYY-MM-DD HH:MM <text>`
 - **Interactive Buttons** — Click to select time/date, no need to memorize commands
@@ -51,7 +51,7 @@ A Telegram bot for personal daily journaling with Solo Leveling theme. Log your 
 - **Auto-restart** — Bot sends menu to all active users on restart
 - **User Tracking** — Tracks active users for notifications
 
-## Commands
+## 📜 Commands
 
 | Command | Description |
 |---------|-------------|
@@ -76,7 +76,7 @@ A Telegram bot for personal daily journaling with Solo Leveling theme. Log your 
 | `/projects` | View GitHub repositories |
 | `/restart` | Restart the bot |
 
-## Project Structure
+## 📂 Project Structure
 
 ```
 joblog/
@@ -98,13 +98,13 @@ joblog/
     └── user_tracker.py # Active user tracking
 ```
 
-## Setup
+## 🚀 Setup
 
-### Prerequisites
+### 📋 Prerequisites
 - Python 3.10+
 - Telegram Bot Token (from @BotFather)
 
-### Installation
+### ⚙️ Installation
 
 1. Clone the repository:
    ```bash
@@ -137,9 +137,9 @@ joblog/
 | `TELEGRAM_API_BASE_URL` | Custom base URL (e.g. Cloudflare proxy URL) | No |
 | `GEMINI_API_KEY` | Google AI Studio API Key | No (Required for Food Scanner) |
 
-## Development
+## 🛠️ Development
 
-### Quick Restart
+### 🔄 Quick Restart
 ```powershell
 # Restart bot
 .\dev-restart.ps1
@@ -154,13 +154,13 @@ joblog/
 .\dev-restart.ps1 -Install
 ```
 
-### Backup Memory
+### 💾 Backup Memory
 ```powershell
 # Save session memory
 .\dream.ps1
 ```
 
-## Tech Stack
+## 💻 Tech Stack
 
 - **Python** 3.14
 - **python-telegram-bot** 22.8 — Telegram Bot API
@@ -168,10 +168,10 @@ joblog/
 - **fpdf2** — PDF generation
 - **JSON** — Local data storage
 
-## License
+## 📄 License
 
 MIT License - see [LICENSE](LICENSE) for details.
 
-## Author
+## 👥 Author
 
 Built with ❤️ by [Pidzzzz](https://github.com/Pidzzzz) using MiMoCode & Antigravity AI Assistants
