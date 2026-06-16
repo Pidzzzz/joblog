@@ -1,6 +1,6 @@
 # SoloLeveling Journal Bot
 
-A Telegram bot for personal daily journaling with Solo Leveling theme. Log your activities, track your rank, and level up your productivity — all from Telegram.
+A Telegram bot for personal daily journaling with Solo Leveling theme. Log your activities, track your rank, scan food nutrients using AI, and level up your productivity — all from Telegram.
 
 ## Features
 
@@ -34,13 +34,19 @@ A Telegram bot for personal daily journaling with Solo Leveling theme. Log your 
   - All entries
   - Custom date range
 
+### AI & Nutrition
+- **AI Food Scanner** — Send a food photo to estimate calories (kcal), protein, carbs, and fats (powered by Gemini 1.5 Flash).
+- **Portion Grammar Support** — Type portion details or food weight (e.g. `nasi 150g`) in the photo's caption for highly accurate analysis.
+- **Save to Log** — Instantly save estimated nutrients to your daily journal.
+
 ### UI/UX
 - **Inline Keyboard Menu** — Section-specific buttons for cleaner navigation
 - **Auto-delete Messages** — Confirmation messages disappear after 3 seconds
-- **Clean Chat** — `/start` clears previous messages
+- **Clean Chat** — Automatically deletes all old chat history on restart, keeping the chat interface pristine.
 - **Command Suggestions** — Type `/` to see all available commands
 
-### System
+### System & Connectivity
+- **Bypass ISP Block** — Serverless Cloudflare Workers reverse proxy configuration for seamless bot running in blocked networks.
 - **AI Info** — `/ai` shows model info and usage statistics
 - **Auto-restart** — Bot sends menu to all active users on restart
 - **User Tracking** — Tracks active users for notifications
@@ -67,6 +73,7 @@ A Telegram bot for personal daily journaling with Solo Leveling theme. Log your 
 | `/remindat YYYY-MM-DD HH:MM <text>` | Set one-time reminder |
 | `/reminders` | List active reminders |
 | `/unremind <id>` | Remove a reminder |
+| `/projects` | View GitHub repositories |
 | `/restart` | Restart the bot |
 
 ## Project Structure
@@ -127,6 +134,8 @@ joblog/
 |----------|-------------|----------|
 | `BOT_TOKEN` | Telegram bot token from @BotFather | Yes |
 | `DEVELOPER_ID` | Your Telegram user ID | Yes |
+| `TELEGRAM_API_BASE_URL` | Custom base URL (e.g. Cloudflare proxy URL) | No |
+| `GEMINI_API_KEY` | Google AI Studio API Key | No (Required for Food Scanner) |
 
 ## Development
 
@@ -165,4 +174,4 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 ## Author
 
-Built with ❤️ by [Pidzzzz](https://github.com/Pidzzzz) using MiMoCode AI Assistant
+Built with ❤️ by [Pidzzzz](https://github.com/Pidzzzz) using MiMoCode & Antigravity AI Assistants
