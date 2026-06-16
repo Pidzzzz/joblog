@@ -67,6 +67,8 @@ def get_streak_info(entries: list) -> dict:
 
     streak = 0
     check_date = date.today()
+    if dates and dates[0] == (date.today() - timedelta(days=1)).isoformat():
+        check_date = date.today() - timedelta(days=1)
 
     for d in dates:
         if d == check_date.isoformat():

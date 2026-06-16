@@ -101,8 +101,24 @@ def generate_pdf(entries=None, start_date=None, end_date=None, output_path=None)
             time_str = e.get("time", "")[:5]
             text = e["text"]
 
+            # Map common emojis to text equivalents so they don't render as '?' in Latin-1 Helvetica
+            emoji_map = {
+                "🍳": "[Nutrisi]",
+                "✅": "[Selesai]",
+                "⬜": "[Belum]",
+                "⏳": "[Pending]",
+                "⏰": "[Reminder]",
+                "📝": "[Catatan]",
+                "📅": "[Tanggal]",
+                "🔥": "[Streak]",
+                "🏆": "[Max]",
+                "⚔️": "[Quest]",
+            }
+            for emoji_char, text_rep in emoji_map.items():
+                text = text.replace(emoji_char, text_rep)
+
             safe_text = text.encode("latin-1", errors="replace").decode("latin-1")
-            pdf.cell(0, 5, f"    [{time_str}]  {safe_text}", new_x="LMARGIN", new_y="NEXT")
+            pdf.multi_cell(0, 5, f"    [{time_str}]  {safe_text}", new_x="LMARGIN", new_y="NEXT")
 
         pdf.ln(3)
 

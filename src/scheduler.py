@@ -28,7 +28,7 @@ def _save_reminders(data):
         json.dump(data, f, indent=2, ensure_ascii=False)
 
 
-async def send_reminder(bot, chat_id, text):
+async def send_reminder(bot, chat_id, text, rid=None):
     from telegram.helpers import escape_markdown
     msg = f"⏰ *Reminder*\n\n{escape_markdown(text, version=2)}"
     try:
@@ -38,6 +38,18 @@ async def send_reminder(bot, chat_id, text):
             await bot.send_message(chat_id=chat_id, text=f"⏰ Reminder:\n\n{text}")
         except Exception:
             logger.error(f"Failed to send reminder: {e}")
+
+    if rid is not None:
+        try:
+            data = _load_reminders()
+            for r in data["reminders"]:
+                if r["id"] == rid and not r["repeat"]:
+                    r["active"] = False
+                    _save_reminders(data)
+                    logger.info(f"One-time reminder #{rid} completed and deactivated.")
+                    break
+        except Exception as e:
+            logger.error(f"Failed to deactivate one-time reminder #{rid}: {e}")
 
 
 def add_reminder(bot, chat_id: int, text: str, remind_at: datetime, repeat: str = None) -> dict:
@@ -78,7 +90,7 @@ def add_reminder(bot, chat_id: int, text: str, remind_at: datetime, repeat: str 
     scheduler.add_job(
         send_reminder,
         trigger=trigger,
-        args=[bot, chat_id, text],
+        args=[bot, chat_id, text, rid],
         id=job_id,
         replace_existing=True,
     )
@@ -142,7 +154,7 @@ def restore_reminders(bot):
         scheduler.add_job(
             send_reminder,
             trigger=trigger,
-            args=[bot, r["chat_id"], r["text"]],
+            args=[bot, r["chat_id"], r["text"], rid],
             id=job_id,
             replace_existing=True,
         )
