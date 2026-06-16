@@ -694,7 +694,7 @@ async def analyze_food_photo(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         
         user_caption = update.message.caption.strip() if update.message.caption else None
         
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key={api_key}"
         
         prompt_text = (
             "Anda adalah ahli gizi bersertifikat. Tugas Anda adalah menganalisis makanan pada gambar yang diberikan.\n"
