@@ -138,6 +138,9 @@ joblog/
 # Pull updates and restart
 .\dev-restart.ps1 -Pull
 
+# Run in watch mode (auto-restart on changes)
+.\dev-restart.ps1 -Watch
+
 # Install auto-restart (every hour)
 .\dev-restart.ps1 -Install
 ```

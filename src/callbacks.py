@@ -439,6 +439,10 @@ async def menu_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             f"*Provider:* `Xiaomi MiMo Team`\n"
             f"*Framework:* `python\\-telegram\\-bot 22\\.8`\n\n"
             "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            "🛠️ *AI Assistants Used:*\n"
+            "  • `MiMoCode` \\(Xiaomi MiMo Team\\)\n"
+            "  • `Antigravity` \\(Google DeepMind Team\\)\n\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
             f"📊 *Statistik Penggunaan:*\n\n"
             f"  📨 Pesan diterima: `{bot_stats['messages_received']}`\n"
             f"  📤 Pesan dikirim: `{bot_stats['messages_sent']}`\n"
@@ -448,10 +452,58 @@ async def menu_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             f"  🎯 Token terpakai: `{bot_stats['tokens_used']}`\n\n"
             "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
             f"⏱️ *Uptime:* `{hours}j {minutes}m {seconds}s`\n\n"
-            "_Bot ini dibangun oleh MiMoCode AI Assistant_"
+            "_Dibuat menggunakan asisten AI MiMoCode & Antigravity_"
         )
         
         await query.edit_message_text(text, parse_mode="MarkdownV2", reply_markup=_menu_keyboard())
+
+    elif data == "menu_projects":
+        await query.edit_message_text("⏳ *Mengambil data proyek dari GitHub\\.\\.\\.*", parse_mode="MarkdownV2")
+        try:
+            from src.commands import fetch_github_projects
+            repos = await fetch_github_projects()
+            if not repos:
+                await query.edit_message_text("❌ *Gagal mengambil data proyek atau tidak ada proyek\\.*", parse_mode="MarkdownV2")
+                return
+                
+            lines = [
+                "╔════════════════════════╗",
+                "🐙   *GITHUB REPOSITORIES*   🐙",
+                "╚════════════════════════╝\n",
+            ]
+            
+            for repo in repos:
+                name = escape_markdown(repo["name"], version=2)
+                desc = escape_markdown(repo["description"] or "Tidak ada deskripsi", version=2)
+                lang = escape_markdown(repo["language"] or "Other", version=2)
+                stars = repo["stargazers_count"]
+                url = repo["html_url"].replace("\\", "\\\\").replace(")", "\\)")
+                
+                lines.append(
+                    f"📁 *{name}* \\({lang}\\)\n"
+                    f"📝 {desc}\n"
+                    f"⭐ Stars: `{stars}`\n"
+                    f"🔗 [Tautan Repositori]({url})\n"
+                    "━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                )
+                
+            msg_text = "\n".join(lines)
+            if len(msg_text) > 4000:
+                msg_text = msg_text[:4000] + "\n\n\\.\\.\\. \\(terlalu banyak proyek\\)"
+                
+            await query.edit_message_text(msg_text, parse_mode="MarkdownV2", disable_web_page_preview=True, reply_markup=_menu_keyboard())
+        except Exception as e:
+            await query.edit_message_text(f"❌ *Error:* `{escape_markdown(str(e), version=2)}`", parse_mode="MarkdownV2")
+
+    elif data == "menu_scan_food":
+        await query.edit_message_text(
+            "🍳 *Pindai Makanan \\(AI\\)*\n\n"
+            "Silakan kirimkan atau lampirkan *foto makanan Anda* langsung ke chat ini\\.\n\n"
+            "AI akan menganalisis porsi, kalori, protein, karbohidrat, dan lemak secara otomatis\\.\n\n"
+            "💡 *Tips:* Anda bisa menambahkan keterangan berat makanan \\(misal: `nasi 150g` atau `200 gram`\\) pada *caption/keterangan foto* sebelum mengirim agar hasil perhitungan AI lebih akurat\\!",
+            parse_mode="MarkdownV2",
+            reply_markup=_section_keyboard("scan_food")
+        )
 
     elif data == "menu_help":
         text = (
@@ -473,6 +525,7 @@ async def menu_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             "`/del \\<id\\>` — Hapus catatan\n"
             "`/clear` — Hapus semua log catatan\n"
             "`/restart` — Memulai ulang bot (refresh)\n"
+            "`/projects` — Tampilkan proyek-proyek GitHub\n"
             "`/remind \\<HH:MM\\> \\<pesan\\>` — Reminder harian\n"
             "`/remindat \\<YYYY\-MM\-DD HH:MM\\> \\<pesan\\>` — Reminder sekali\n"
             "`/reminders` — Daftar reminder aktif\n"
@@ -499,6 +552,32 @@ async def menu_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             "✏️ *Custom Date Range*\n\nKetik:\n`/export YYYY\-MM\-DD YYYY\-MM\-DD`\n\nContoh:\n`/export 2026\-06\-01 2026\-06\-15`",
             parse_mode="MarkdownV2",
             reply_markup=_menu_keyboard(),
+        )
+    elif data == "save_food_log":
+        food_data = ctx.user_data.get("pending_food_log")
+        if not food_data:
+            await query.edit_message_text("❌ *Data makanan tidak ditemukan atau sudah kadaluarsa\\.*", parse_mode="MarkdownV2", reply_markup=_menu_keyboard())
+            return
+            
+        ctx.user_data.pop("pending_food_log")
+        entry_text = f"🍳 [Log Nutrisi] {food_data['text']}"
+        entry = storage.add_entry(entry_text, entry_date=food_data['date'], entry_time=food_data['time'])
+        
+        escaped_entry = escape_markdown(entry_text, version=2)
+        await query.edit_message_text(
+            f"✅ *Log makanan berhasil disimpan ke Jurnal\\!*\n\n"
+            f"📝 _{escaped_entry}_",
+            parse_mode="MarkdownV2",
+            reply_markup=_menu_keyboard()
+        )
+
+    elif data == "cancel_food_log":
+        if "pending_food_log" in ctx.user_data:
+            ctx.user_data.pop("pending_food_log")
+        await query.edit_message_text(
+            "❌ *Analisis makanan dibatalkan\\.*",
+            parse_mode="MarkdownV2",
+            reply_markup=_menu_keyboard()
         )
 
 

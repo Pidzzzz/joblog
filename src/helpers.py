@@ -6,9 +6,83 @@ from telegram import Update
 
 OWNER_ID = int(os.getenv("DEVELOPER_ID", "0"))
 
+import json
+
+HISTORY_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "messages_history.json")
+
+def load_history():
+    if os.path.exists(HISTORY_FILE):
+        try:
+            with open(HISTORY_FILE, "r") as f:
+                data = json.load(f)
+                return (
+                    {int(k): v for k, v in data.get("last_bot_messages", {}).items()},
+                    {int(k): v for k, v in data.get("bot_message_history", {}).items()}
+                )
+        except Exception:
+            pass
+    return {}, {}
+
+def save_history():
+    try:
+        serialized_last = {}
+        for chat_id, val in last_bot_messages.items():
+            if isinstance(val, int):
+                serialized_last[chat_id] = val
+            elif hasattr(val, "message_id"):
+                serialized_last[chat_id] = val.message_id
+            else:
+                serialized_last[chat_id] = val
+
+        data = {
+            "last_bot_messages": serialized_last,
+            "bot_message_history": bot_message_history
+        }
+        with open(HISTORY_FILE, "w") as f:
+            json.dump(data, f)
+    except Exception as e:
+        print(f"Error saving history: {e}")
+
+class PersistentDict(dict):
+    def __setitem__(self, key, value):
+        super().__setitem__(key, value)
+        save_history()
+        
+    def __delitem__(self, key):
+        super().__delitem__(key)
+        save_history()
+        
+    def pop(self, key, default=None):
+        res = super().pop(key, default)
+        save_history()
+        return res
+        
+    def clear(self):
+        super().clear()
+        save_history()
+
+def append_to_history(chat_id, message_id):
+    if chat_id not in bot_message_history:
+        bot_message_history[chat_id] = []
+    if message_id not in bot_message_history[chat_id]:
+        bot_message_history[chat_id].append(message_id)
+    save_history()
+
+def remove_from_history(chat_id, message_id):
+    if chat_id in bot_message_history and message_id in bot_message_history[chat_id]:
+        bot_message_history[chat_id].remove(message_id)
+        save_history()
+
+last_bot_messages = PersistentDict()
+bot_message_history = PersistentDict()
+
+_last, _hist = load_history()
+for k, v in _last.items():
+    dict.__setitem__(last_bot_messages, k, v)
+for k, v in _hist.items():
+    dict.__setitem__(bot_message_history, k, v)
+
 delete_selections = {}
-last_bot_messages = {}
-bot_message_history = {}
 user_reminder_state = {}
 
 bot_stats = {
@@ -74,9 +148,13 @@ def _menu_keyboard():
         ],
         [
             InlineKeyboardButton("🤖 AI Info", callback_data="menu_ai"),
-            InlineKeyboardButton("❓ Panduan", callback_data="menu_help"),
+            InlineKeyboardButton("📂 Projects", callback_data="menu_projects"),
         ],
         [
+            InlineKeyboardButton("🍳 Pindai Makanan (AI)", callback_data="menu_scan_food"),
+        ],
+        [
+            InlineKeyboardButton("❓ Panduan", callback_data="menu_help"),
             InlineKeyboardButton("🔄 Restart Bot", callback_data="menu_restart"),
         ]
     ]
@@ -115,15 +193,17 @@ def _section_keyboard(section):
             [InlineKeyboardButton("🔄 Restart Bot", callback_data="menu_restart")],
             [InlineKeyboardButton("❌ Kembali", callback_data="menu_start")],
         ])
+    elif section == "scan_food":
+        return InlineKeyboardMarkup([
+            [InlineKeyboardButton("❌ Kembali", callback_data="menu_start")],
+        ])
     return _menu_keyboard()
 
 
 async def _send_and_auto_delete(message, text, delay=3):
     msg = await message.reply_text(text)
     chat_id = message.chat_id
-    if chat_id not in bot_message_history:
-        bot_message_history[chat_id] = []
-    bot_message_history[chat_id].append(msg.message_id)
+    append_to_history(chat_id, msg.message_id)
     asyncio.create_task(_auto_delete_message(message.bot, chat_id, msg.message_id, delay))
 
 
@@ -131,29 +211,33 @@ async def _auto_delete_message(bot, chat_id, message_id, delay):
     await asyncio.sleep(delay)
     try:
         await bot.delete_message(chat_id=chat_id, message_id=message_id)
-        if chat_id in bot_message_history and message_id in bot_message_history[chat_id]:
-            bot_message_history[chat_id].remove(message_id)
+        remove_from_history(chat_id, message_id)
     except Exception:
         pass
 
 
-async def _delete_all_bot_messages(chat_id, ctx=None):
+async def _delete_all_bot_messages(chat_id, ctx=None, bot=None):
     deleted = 0
+    bot_obj = bot if bot else (ctx.bot if ctx else None)
     
     old_msg = last_bot_messages.get(chat_id)
     if old_msg:
         try:
-            await old_msg.delete()
-            deleted += 1
+            if hasattr(old_msg, "delete"):
+                await old_msg.delete()
+                deleted += 1
+            elif isinstance(old_msg, int) and bot_obj:
+                await bot_obj.delete_message(chat_id=chat_id, message_id=old_msg)
+                deleted += 1
         except Exception:
             pass
         last_bot_messages.pop(chat_id, None)
     
-    if ctx:
+    if bot_obj:
         if chat_id in bot_message_history:
             for msg_id in list(bot_message_history[chat_id]):
                 try:
-                    await ctx.bot.delete_message(chat_id=chat_id, message_id=msg_id)
+                    await bot_obj.delete_message(chat_id=chat_id, message_id=msg_id)
                     deleted += 1
                 except Exception:
                     pass

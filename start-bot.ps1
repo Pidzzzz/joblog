@@ -3,7 +3,7 @@ param(
     [switch]$Remove
 )
 
-$BotDir = "D:\joblog"
+$BotDir = $PSScriptRoot
 $ScriptName = "SoloLeveling"
 
 function Start-Bot {

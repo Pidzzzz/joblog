@@ -15,7 +15,8 @@ from src.helpers import (
     OWNER_ID, _is_owner, safe_delete_message, _fmt_entry, _fmt_entries,
     _menu_keyboard, _section_keyboard, _send_and_auto_delete,
     _delete_all_bot_messages, last_bot_messages, bot_message_history,
-    user_reminder_state, bot_stats, estimate_tokens
+    user_reminder_state, bot_stats, estimate_tokens, append_to_history,
+    remove_from_history
 )
 
 
@@ -24,6 +25,8 @@ def _track_command(update: Update):
     bot_stats["commands_used"] += 1
     if bot_stats["start_time"] is None:
         bot_stats["start_time"] = datetime.now()
+    if update.message:
+        append_to_history(update.effective_chat.id, update.message.message_id)
 
 
 async def start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -75,12 +78,9 @@ async def cmd_log(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     entry = storage.add_entry(text)
     msg_text = f"✅ *Tersimpan*\n{_fmt_entry(entry)}"
     
-    if chat_id not in bot_message_history:
-        bot_message_history[chat_id] = []
-    
     try:
         msg = await ctx.bot.send_message(chat_id=chat_id, text=msg_text, parse_mode="MarkdownV2")
-        bot_message_history[chat_id].append(msg.message_id)
+        append_to_history(chat_id, msg.message_id)
         bot_stats["messages_sent"] += 1
         bot_stats["tokens_used"] += estimate_tokens(msg_text)
         asyncio.create_task(_auto_delete_message(ctx.bot, chat_id, msg.message_id, 3))
@@ -92,8 +92,7 @@ async def _auto_delete_message(bot, chat_id, message_id, delay):
     await asyncio.sleep(delay)
     try:
         await bot.delete_message(chat_id=chat_id, message_id=message_id)
-        if chat_id in bot_message_history and message_id in bot_message_history[chat_id]:
-            bot_message_history[chat_id].remove(message_id)
+        remove_from_history(chat_id, message_id)
     except Exception:
         pass
 
@@ -439,6 +438,10 @@ async def cmd_ai(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         f"*Provider:* `Xiaomi MiMo Team`\n"
         f"*Framework:* `python\\-telegram\\-bot 22\\.8`\n\n"
         "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "🛠️ *AI Assistants Used:*\n"
+        "  • `MiMoCode` \\(Xiaomi MiMo Team\\)\n"
+        "  • `Antigravity` \\(Google DeepMind Team\\)\n\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
         f"📊 *Statistik Penggunaan:*\n\n"
         f"  📨 Pesan diterima: `{bot_stats['messages_received']}`\n"
         f"  📤 Pesan dikirim: `{bot_stats['messages_sent']}`\n"
@@ -448,7 +451,7 @@ async def cmd_ai(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         f"  🎯 Token terpakai: `{bot_stats['tokens_used']}`\n\n"
         "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
         f"⏱️ *Uptime:* `{hours}j {minutes}m {seconds}s`\n\n"
-        "_Bot ini dibangun oleh MiMoCode AI Assistant_"
+        "_Dibuat menggunakan asisten AI MiMoCode & Antigravity_"
     )
     
     await update.message.reply_text(text, parse_mode="MarkdownV2", reply_markup=_menu_keyboard())
@@ -512,6 +515,8 @@ async def _generate_and_send_pdf_custom(message, start_date=None, end_date=None)
 async def auto_log(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not _is_owner(update):
         return
+    if update.message:
+        append_to_history(update.effective_chat.id, update.message.message_id)
     text = update.message.text.strip()
     if not text:
         return
@@ -591,12 +596,192 @@ async def auto_log(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     entry = storage.add_entry(text)
     msg_text = f"✅ *Tersimpan*\n{_fmt_entry(entry)}"
     
-    if chat_id not in bot_message_history:
-        bot_message_history[chat_id] = []
-    
     try:
         msg = await ctx.bot.send_message(chat_id=chat_id, text=msg_text, parse_mode="MarkdownV2")
-        bot_message_history[chat_id].append(msg.message_id)
+        append_to_history(chat_id, msg.message_id)
         asyncio.create_task(_auto_delete_message(ctx.bot, chat_id, msg.message_id, 3))
     except Exception:
         pass
+
+
+async def fetch_github_projects():
+    import httpx
+    url = "https://api.github.com/users/Pidzzzz/repos"
+    headers = {"User-Agent": "python-telegram-bot"}
+    async with httpx.AsyncClient() as client:
+        response = await client.get(url, headers=headers)
+        if response.status_code == 200:
+            return response.json()
+    return []
+
+
+async def cmd_projects(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    _track_command(update)
+    if not _is_owner(update):
+        return
+    safe_delete_message(update.message)
+    
+    loading_msg = await update.message.reply_text("⏳ *Mengambil data proyek dari GitHub\\.\\.\\.*", parse_mode="MarkdownV2")
+    
+    try:
+        repos = await fetch_github_projects()
+        if not repos:
+            await loading_msg.edit_text("❌ *Gagal mengambil data proyek atau tidak ada proyek\\.*", parse_mode="MarkdownV2")
+            return
+            
+        lines = [
+            "╔════════════════════════╗",
+            "🐙   *GITHUB REPOSITORIES*   🐙",
+            "╚════════════════════════╝\n",
+        ]
+        
+        for repo in repos:
+            name = escape_markdown(repo["name"], version=2)
+            desc = escape_markdown(repo["description"] or "Tidak ada deskripsi", version=2)
+            lang = escape_markdown(repo["language"] or "Other", version=2)
+            stars = repo["stargazers_count"]
+            url = repo["html_url"].replace("\\", "\\\\").replace(")", "\\)")
+            
+            lines.append(
+                f"📁 *{name}* \\({lang}\\)\n"
+                f"📝 {desc}\n"
+                f"⭐ Stars: `{stars}`\n"
+                f"🔗 [Tautan Repositori]({url})\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            )
+            
+        msg_text = "\n".join(lines)
+        if len(msg_text) > 4000:
+            msg_text = msg_text[:4000] + "\n\n\\.\\.\\. \\(terlalu banyak proyek\\)"
+            
+        await loading_msg.edit_text(msg_text, parse_mode="MarkdownV2", disable_web_page_preview=True, reply_markup=_menu_keyboard())
+    except Exception as e:
+        await loading_msg.edit_text(f"❌ *Error:* `{escape_markdown(str(e), version=2)}`", parse_mode="MarkdownV2")
+
+
+async def analyze_food_photo(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    import html
+    import base64
+    import httpx
+    
+    _track_command(update)
+    if not _is_owner(update):
+        return
+    
+    chat_id = update.effective_chat.id
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        msg = await update.message.reply_html(
+            "❌ <b>API Key Gemini belum diatur!</b>\n\n"
+            "Silakan dapatkan API Key gratis di <code>https://aistudio.google.com/</code> "
+            "lalu tambahkan baris berikut di file <code>.env</code>:\n"
+            "<code>GEMINI_API_KEY=key_anda</code>\n\n"
+            "Setelah ditambahkan, bot akan otomatis restart dan siap digunakan.",
+            reply_markup=_menu_keyboard()
+        )
+        append_to_history(chat_id, msg.message_id)
+        return
+
+    loading_msg = await update.message.reply_html("⏳ <b>Menganalisis foto makanan dengan AI...</b>")
+    append_to_history(chat_id, loading_msg.message_id)
+    
+    try:
+        photo = update.message.photo[-1]
+        photo_file = await photo.get_file()
+        img_bytes = await photo_file.download_as_bytearray()
+        
+        img_base64 = base64.b64encode(img_bytes).decode("utf-8")
+        
+        user_caption = update.message.caption.strip() if update.message.caption else None
+        
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+        
+        prompt_text = (
+            "Anda adalah ahli gizi bersertifikat. Tugas Anda adalah menganalisis makanan pada gambar yang diberikan.\n"
+            "1. Identifikasi semua makanan dan minuman yang terlihat.\n"
+            "2. Perkirakan berat/porsi masing-masing secara visual. Jika pengguna memberikan informasi gramasi/keterangan tambahan, gunakan informasi tersebut sebagai acuan utama.\n"
+            "3. Estimasi jumlah Kalori (kcal), Protein (g), Karbohidrat (g), dan Lemak (g) berdasarkan USDA atau TKPI (Tabel Komposisi Pangan Indonesia).\n"
+            "4. Berikan total nutrisi.\n"
+            "5. Berikan saran/tips singkat tentang gizi makanan tersebut (misal: tinggi protein, tinggi lemak jenuh, kurang serat, dll.).\n\n"
+            "PENTING: Tuliskan respon Anda dalam BAHASA INDONESIA dan gunakan format HTML Telegram. "
+            "Hanya gunakan tag HTML berikut: <b> untuk tebal, <i> untuk miring, <code> untuk teks kode, <pre> untuk blok kode. "
+            "Jangan gunakan format markdown (seperti **, *, `) sama sekali, dan jangan gunakan tag HTML selain yang disebutkan. "
+            "Di baris paling pertama/kedua, berikan rangkuman satu baris dalam format yang persis seperti ini:\n"
+            "===LOG_SUMMARY===\n"
+            "[Nama makanan utama] (~[total_kalori] kcal, [total_protein]g protein)\n"
+            "===END_LOG_SUMMARY==="
+        )
+        
+        if user_caption:
+            prompt_text += f"\n\nInformasi tambahan dari pengguna mengenai porsi/berat/makanan: {user_caption}"
+            
+        payload = {
+            "contents": [
+                {
+                    "parts": [
+                        {
+                            "text": prompt_text
+                        },
+                        {
+                            "inlineData": {
+                                "mimeType": "image/jpeg",
+                                "data": img_base64
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+        
+        async with httpx.AsyncClient() as client:
+            response = await client.post(url, json=payload, headers={"Content-Type": "application/json"}, timeout=30.0)
+            
+        if response.status_code != 200:
+            raise Exception(f"Gemini API returned status {response.status_code}: {response.text}")
+            
+        result = response.json()
+        candidates = result.get("candidates", [])
+        if not candidates:
+            raise Exception("No analysis result returned from Gemini API.")
+            
+        content_text = candidates[0]["content"]["parts"][0]["text"]
+        
+        log_summary = "Porsi Makanan"
+        summary_match = re.search(r"===LOG_SUMMARY===\s*(.*?)\s*===END_LOG_SUMMARY===", content_text, re.DOTALL)
+        if summary_match:
+            log_summary = summary_match.group(1).strip()
+            content_text = content_text.replace(summary_match.group(0), "").strip()
+            
+        ctx.user_data["pending_food_log"] = {
+            "text": log_summary,
+            "date": date.today().isoformat(),
+            "time": datetime.now().strftime("%H:%M:%S")
+        }
+        
+        keyboard = [
+            [
+                InlineKeyboardButton("✅ Simpan ke Jurnal", callback_data="save_food_log"),
+                InlineKeyboardButton("❌ Batal", callback_data="cancel_food_log")
+            ]
+        ]
+        
+        try:
+            await loading_msg.delete()
+            remove_from_history(chat_id, loading_msg.message_id)
+        except Exception:
+            pass
+            
+        msg = await update.message.reply_html(
+            f"🍳 <b>HASIL ANALISIS NUTRISI</b>\n\n{content_text}",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        append_to_history(chat_id, msg.message_id)
+        
+    except Exception as e:
+        try:
+            await loading_msg.delete()
+            remove_from_history(chat_id, loading_msg.message_id)
+        except Exception:
+            pass
+        msg = await update.message.reply_html(f"❌ <b>Gagal menganalisis foto:</b> <code>{html.escape(str(e))}</code>")
+        append_to_history(chat_id, msg.message_id)

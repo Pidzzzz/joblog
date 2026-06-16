@@ -1,13 +1,22 @@
 param(
     [switch]$Pull,
-    [switch]$Install
+    [switch]$Install,
+    [switch]$Watch
 )
 
-$botScript = "D:\RE_Project\joblog\bot.py"
+$botScript = "$PSScriptRoot\bot.py"
 $processName = "python"
-$scriptDir = "D:\RE_Project\joblog"
+$scriptDir = $PSScriptRoot
 
 function Stop-Bot {
+    $nodeProcs = Get-CimInstance Win32_Process -Filter "Name='node.exe'" |
+        Where-Object { $_.CommandLine -match "nodemon" -and $_.CommandLine -match "joblog" }
+    if ($nodeProcs) {
+        foreach ($np in $nodeProcs) {
+            Write-Host "[STOP] Killing nodemon PID $($np.ProcessId)..." -ForegroundColor Red
+            Stop-Process -Id $np.ProcessId -Force
+        }
+    }
     $procs = Get-CimInstance Win32_Process -Filter "Name='python.exe'" |
         Where-Object { $_.CommandLine -match "joblog" -and $_.CommandLine -match "bot.py" }
     if ($procs) {
@@ -23,18 +32,17 @@ function Stop-Bot {
 }
 
 function Start-Bot {
-    Write-Host "[START] Starting bot..." -ForegroundColor Cyan
-    $psi = New-Object System.Diagnostics.ProcessStartInfo
-    $psi.FileName = "python"
-    $psi.Arguments = $botScript
-    $psi.WorkingDirectory = $scriptDir
-    $psi.UseShellExecute = $false
-    $psi.CreateNoWindow = $false
-    $psi.RedirectStandardOutput = $false
-    $psi.RedirectStandardError = $false
-    Start-Process -FilePath "python" -ArgumentList $botScript -WorkingDirectory $scriptDir -WindowStyle Normal
-    Start-Sleep -Seconds 2
-    Write-Host "[OK] Bot started!" -ForegroundColor Green
+    if ($Watch) {
+        Write-Host "[START] Starting bot in watch mode (auto-restart on changes)..." -ForegroundColor Cyan
+        Start-Process -FilePath "cmd.exe" -ArgumentList "/c npx -y nodemon --watch src --watch bot.py --ext py,json,env --exec python bot.py" -WorkingDirectory $scriptDir -WindowStyle Normal
+        Start-Sleep -Seconds 2
+        Write-Host "[OK] Bot started in watch mode!" -ForegroundColor Green
+    } else {
+        Write-Host "[START] Starting bot..." -ForegroundColor Cyan
+        Start-Process -FilePath "python" -ArgumentList $botScript -WorkingDirectory $scriptDir -WindowStyle Normal
+        Start-Sleep -Seconds 2
+        Write-Host "[OK] Bot started!" -ForegroundColor Green
+    }
 }
 
 function Install-ScheduledRestart {

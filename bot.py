@@ -72,22 +72,19 @@ async def post_init(app):
         BotCommand("remindat", "Reminder sekali"),
         BotCommand("reminders", "Daftar reminder aktif"),
         BotCommand("unremind", "Hapus reminder"),
+        BotCommand("projects", "Lihat proyek GitHub"),
         BotCommand("restart", "Restart bot"),
     ]
     await app.bot.set_my_commands(commands)
     print("Bot commands registered.")
 
+    restart_chat_id = None
     restart_file = os.path.join(os.path.dirname(__file__), ".restart_chat")
     if os.path.exists(restart_file):
         try:
             with open(restart_file, "r") as f:
-                chat_id = int(f.read().strip())
-            track_user(chat_id)
-            await app.bot.send_message(
-                chat_id=chat_id,
-                text="✅ *Bot berhasil restart\\! Arise\\!*",
-                parse_mode="MarkdownV2",
-            )
+                restart_chat_id = int(f.read().strip())
+            track_user(restart_chat_id)
         except Exception:
             pass
         finally:
@@ -99,24 +96,76 @@ async def post_init(app):
     active_users = get_active_users()
     if active_users:
         print(f"Sending update menu to {len(active_users)} active users...")
-        text = get_start_text()
-        keyboard = _menu_keyboard()
         sent = 0
+        from src.helpers import _delete_all_bot_messages, last_bot_messages
         for uid in active_users:
             try:
-                await app.bot.send_message(
+                await _delete_all_bot_messages(uid, bot=app.bot)
+                
+                if uid == restart_chat_id:
+                    menu_text = "✅ *Bot berhasil restart\\! Arise\\!*\n\n" + get_start_text()
+                else:
+                    menu_text = get_start_text()
+                    
+                msg = await app.bot.send_message(
                     chat_id=uid,
-                    text=text,
+                    text=menu_text,
                     parse_mode="MarkdownV2",
-                    reply_markup=keyboard,
+                    reply_markup=_menu_keyboard(),
                 )
+                last_bot_messages[uid] = msg.message_id
                 sent += 1
-            except Exception:
+            except Exception as e:
+                print(f"Error sending start menu to {uid}: {e}")
                 pass
         print(f"Menu sent to {sent}/{len(active_users)} users.")
 
 def main():
-    app = ApplicationBuilder().token(TOKEN).post_init(post_init).build()
+    import httpx
+    from telegram.request import HTTPXRequest
+    
+    base_url = os.getenv("TELEGRAM_API_BASE_URL")
+    
+    transport = httpx.AsyncHTTPTransport(local_address="0.0.0.0")
+    request = HTTPXRequest(connect_timeout=20, read_timeout=20, httpx_kwargs={"transport": transport})
+    
+    builder = ApplicationBuilder().token(TOKEN).request(request).post_init(post_init)
+    if base_url:
+        builder = builder.base_url(base_url)
+        if "/bot" in base_url:
+            base_file_url = base_url.replace("/bot", "/file/bot")
+            builder = builder.base_file_url(base_file_url)
+            
+    app = builder.build()
+
+    # Wrap send_message and send_document to automatically track all sent messages
+    from telegram.ext import ExtBot
+
+    orig_send_message = ExtBot.send_message
+    async def wrapped_send_message(self, *args, **kwargs):
+        msg = await orig_send_message(self, *args, **kwargs)
+        try:
+            chat_id = kwargs.get("chat_id") or (args[0] if len(args) > 0 else None)
+            if chat_id and msg and hasattr(msg, "message_id"):
+                from src.helpers import append_to_history
+                append_to_history(int(chat_id), msg.message_id)
+        except Exception:
+            pass
+        return msg
+    ExtBot.send_message = wrapped_send_message
+
+    orig_send_document = ExtBot.send_document
+    async def wrapped_send_document(self, *args, **kwargs):
+        msg = await orig_send_document(self, *args, **kwargs)
+        try:
+            chat_id = kwargs.get("chat_id") or (args[0] if len(args) > 0 else None)
+            if chat_id and msg and hasattr(msg, "message_id"):
+                from src.helpers import append_to_history
+                append_to_history(int(chat_id), msg.message_id)
+        except Exception:
+            pass
+        return msg
+    ExtBot.send_document = wrapped_send_document
 
     for h in get_handlers():
         app.add_handler(h)
@@ -125,3 +174,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+# Proxy base URL and Gemini key configured successfully
